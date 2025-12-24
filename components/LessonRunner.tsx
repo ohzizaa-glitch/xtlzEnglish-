@@ -37,6 +37,7 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
     setError(null);
     try {
       const ai = createAIClient();
+      // Using gemini-2.0-flash-exp explicitly to avoid rate limits on preview models
       const prompt = `
         Create an English lesson for the topic: "${topic.title}" (Level ${topic.level}).
         Grammar Focus: ${topic.description}.
@@ -61,7 +62,7 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
       `;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.0-flash-exp',
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
@@ -162,7 +163,7 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
       `;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.0-flash-exp',
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });

@@ -71,7 +71,7 @@ const CollectionManager: React.FC<CollectionManagerProps> = ({
       `;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.0-flash-exp',
         contents: prompt,
         config: {
           responseMimeType: "application/json"

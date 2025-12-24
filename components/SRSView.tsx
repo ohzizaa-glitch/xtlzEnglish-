@@ -146,7 +146,7 @@ const SRSView: React.FC<SRSViewProps> = ({ items, mode, onComplete, onCancel, on
       `;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash',
+        model: 'gemini-2.0-flash-exp',
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
