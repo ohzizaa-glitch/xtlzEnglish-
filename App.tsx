@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Card, Rule, UserProfile, CardStatus, ItemType, ReviewItem } from './types';
+import { Card, Rule, UserProfile, CardStatus, ItemType, ReviewItem, ReviewMode } from './types';
 import { INITIAL_CARDS, INITIAL_RULES } from './constants';
 import Dashboard from './components/Dashboard';
 import SRSView from './components/SRSView';
@@ -9,8 +9,9 @@ import { getNextReviewBatch, updateCardSRS, getRandomBatch } from './lib/srs';
 
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<'home' | 'review' | 'collection'>('home');
+  const [reviewMode, setReviewMode] = useState<ReviewMode>('flashcards');
   const [isInfiniteMode, setIsInfiniteMode] = useState(false);
-  const [reviewSessionId, setReviewSessionId] = useState(0); // Used to force remount of SRSView
+  const [reviewSessionId, setReviewSessionId] = useState(0); 
 
   const [cards, setCards] = useState<Card[]>([]);
   const [rules, setRules] = useState<Rule[]>([]);
@@ -56,7 +57,8 @@ const App: React.FC = () => {
     localStorage.setItem('lm_profile', JSON.stringify(profile));
   }, [cards, rules, profile]);
 
-  const handleStartReview = () => {
+  const handleStartReview = (mode: ReviewMode) => {
+    setReviewMode(mode);
     setIsInfiniteMode(false);
     setReviewSessionId(prev => prev + 1);
     setActiveView('review');
@@ -90,7 +92,7 @@ const App: React.FC = () => {
     setCards(newCards);
     setRules(newRules);
     updateStats(0, results.length);
-    setIsInfiniteMode(false); // Reset mode after completion
+    setIsInfiniteMode(false); 
     setActiveView('home');
   };
 
@@ -152,22 +154,30 @@ const App: React.FC = () => {
       type: ItemType.Rule
     };
     setRules([newRule, ...rules]);
-    updateStats(1, 0); // Count adding rules too
+    updateStats(1, 0); 
   };
 
   const handleUpdateRule = (updatedRule: Rule) => {
     setRules(rules.map(r => r.id === updatedRule.id ? updatedRule : r));
   };
 
-  // Combine both for the review queue
-  const combinedItems: ReviewItem[] = [...cards, ...rules];
-  
   const currentReviewBatch = useMemo(() => {
-    if (isInfiniteMode) {
-      return getRandomBatch(combinedItems, 10);
+    // FILTER CONTENT BASED ON MODE
+    let itemsToReview: ReviewItem[] = [];
+
+    if (reviewMode === 'flashcards' || reviewMode === 'writing') {
+        itemsToReview = [...cards];
+    } else if (reviewMode === 'grammar') {
+        itemsToReview = [...rules];
     }
-    return getNextReviewBatch(combinedItems);
-  }, [cards, rules, isInfiniteMode, reviewSessionId]);
+
+    if (itemsToReview.length === 0) return [];
+
+    if (isInfiniteMode) {
+      return getRandomBatch(itemsToReview, 10);
+    }
+    return getNextReviewBatch(itemsToReview);
+  }, [cards, rules, isInfiniteMode, reviewSessionId, reviewMode]);
 
   return (
     <div className="min-h-screen pb-24 text-slate-100 font-sans">
@@ -219,6 +229,7 @@ const App: React.FC = () => {
           <SRSView 
             key={reviewSessionId}
             items={currentReviewBatch} 
+            mode={reviewMode}
             onComplete={handleCompleteReview}
             onCancel={() => setActiveView('home')}
             onInfiniteReview={handleStartInfiniteMode}
@@ -239,18 +250,19 @@ const App: React.FC = () => {
         )}
       </main>
 
-      {/* Mobile Nav Bar - Bottom Glass */}
+      {/* Mobile Nav Bar */}
       <div className="md:hidden fixed bottom-6 left-1/2 -translate-x-1/2 w-[90%] max-w-sm z-50">
         <div className="glass-panel rounded-[2rem] px-6 py-4 flex justify-between items-center shadow-2xl">
           <button onClick={() => setActiveView('home')} className={`flex flex-col items-center gap-1 transition-colors ${activeView === 'home' ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 'text-slate-500'}`}>
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
           </button>
           
+          {/* Mobile central button just returns to dashboard to pick mode */}
           <button 
-            onClick={handleStartReview} 
+            onClick={() => setActiveView('home')} 
             className="w-14 h-14 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center text-white -mt-10 shadow-[0_0_20px_rgba(6,182,212,0.6)] border-4 border-[#0a0a0a] hover:scale-110 transition-transform"
           >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+             <span className="text-2xl">⚡️</span>
           </button>
           
           <button onClick={() => setActiveView('collection')} className={`flex flex-col items-center gap-1 transition-colors ${activeView === 'collection' ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 'text-slate-500'}`}>

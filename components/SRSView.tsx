@@ -1,33 +1,33 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { ReviewItem, CardStatus, ItemType, Rule } from '../types';
+import { ReviewItem, CardStatus, ItemType, Rule, ReviewMode } from '../types';
 import { createAIClient } from '../lib/gemini';
 
 interface SRSViewProps {
   items: ReviewItem[];
+  mode: ReviewMode;
   onComplete: (results: { id: string; remembered: boolean }[]) => void;
   onCancel: () => void;
   onInfiniteReview?: () => void;
 }
 
-type ReviewMode = 'standard' | 'writing' | 'grammar';
-type FeedbackStatus = 'idle' | 'correct' | 'wrong';
+type FeedbackStatus = 'idle' | 'correct' | 'wrong' | 'revealed';
 
 interface GrammarQuizData {
-  question: string;
-  correctAnswer: string;
-  maskedSentence: string;
-  options: string[];
-  correctIndex: number;
+  type: 'choice' | 'translate' | 'question';
+  instruction: string; // The text shown to user (e.g. "Translate this")
+  question: string; // The content (e.g. Russian sentence)
+  correctAnswer: string; // The expected English output
+  options?: string[]; // For choice type
+  correctIndex?: number; // For choice type
 }
 
-const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfiniteReview }) => {
+const SRSView: React.FC<SRSViewProps> = ({ items, mode, onComplete, onCancel, onInfiniteReview }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [sessionResults, setSessionResults] = useState<{ id: string; remembered: boolean }[]>([]);
   
-  // Modes
-  const [mode, setMode] = useState<ReviewMode>('standard');
+  // State for Writing and AI modes
   const [inputValue, setInputValue] = useState('');
   const [feedback, setFeedback] = useState<FeedbackStatus>('idle');
   
@@ -38,6 +38,7 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
   const [showTheory, setShowTheory] = useState(true);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const currentItem = items[currentIndex];
 
@@ -51,20 +52,11 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
     setQuizData(null);
     setQuizError(null);
 
-    // DETERMINE MODE
-    if (currentItem.type === ItemType.Rule) {
-      setMode('grammar');
-    } else {
-      // Logic for cards: Writing mode only for cards that are NOT 'New'.
-      // 33% chance of writing mode.
-      const shouldWrite = currentItem.status !== CardStatus.New && Math.random() > 0.66;
-      setMode(shouldWrite ? 'writing' : 'standard');
-      
-      if (shouldWrite) {
+    // Focus input if in writing mode
+    if (mode === 'writing') {
         setTimeout(() => inputRef.current?.focus(), 100);
-      }
     }
-  }, [currentIndex, currentItem]);
+  }, [currentIndex, currentItem, mode]);
 
   const handleAnswer = (remembered: boolean) => {
     const newResults = [...sessionResults, { id: currentItem.id, remembered }];
@@ -77,6 +69,7 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
     }
   };
 
+  // --- WRITING MODE LOGIC ---
   const handleWritingSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (mode !== 'writing') return;
@@ -86,7 +79,6 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
         return;
     }
 
-    // Safe cast since we know it's a card in writing mode
     const card = currentItem as any; 
     const cleanInput = inputValue.trim().toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g,"");
     const cleanTarget = card.front.trim().toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g,"");
@@ -99,6 +91,7 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
     }
   };
 
+  // --- AI GRAMMAR LOGIC ---
   const generateQuiz = async () => {
     if (mode !== 'grammar' || !currentItem) return;
     
@@ -111,21 +104,34 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
       const ai = createAIClient();
       
       const prompt = `
-        Create a grammar quiz for the English rule: "${rule.title}".
+        You are an English teacher. Create a grammar exercise for the rule: "${rule.title}".
         Explanation: "${rule.explanation}".
         
-        1. Create a simple sentence in Russian that requires this grammar rule to be translated correctly.
-        2. Create the correct English translation using the rule.
-        3. Create a 'masked' version of the English sentence where the key grammatical part is missing (replaced by underscores).
-        4. Provide 3 options for the missing part (1 correct, 2 common mistakes).
+        Randomly select ONE of these 3 types: 'choice', 'translate', or 'question'.
+
+        1. Type 'choice':
+           - Create a 'masked' English sentence where the key grammar part is missing (replaced by _____).
+           - Provide 3 options (1 correct, 2 common mistakes).
+           - Instruction: "Choose the correct form."
+        
+        2. Type 'translate':
+           - Create a simple Russian sentence that MUST use this grammar rule when translated.
+           - Provide the correct English translation.
+           - Instruction: "Translate into English."
+
+        3. Type 'question':
+           - Ask a question in English that forces the user to use this rule in their answer.
+           - Provide an example of a good correct answer.
+           - Instruction: "Answer the question in English."
         
         Return ONLY a JSON object:
         {
-          "question": "Russian sentence",
-          "correctAnswer": "Full English sentence",
-          "maskedSentence": "I _____ to the store yesterday.",
-          "options": ["go", "went", "gone"],
-          "correctIndex": 1
+          "type": "choice" | "translate" | "question",
+          "instruction": "Instruction string",
+          "question": "The question text (Russian sentence, or English question, or masked sentence)",
+          "correctAnswer": "The full correct English sentence or answer",
+          "options": ["opt1", "opt2", "opt3"], // Only for 'choice'
+          "correctIndex": 0 // Only for 'choice'
         }
       `;
 
@@ -137,19 +143,21 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
 
       if (response.text) {
         setQuizData(JSON.parse(response.text));
+        // Auto-focus text area if not choice
+        setTimeout(() => textareaRef.current?.focus(), 100);
       } else {
-        throw new Error("Пустой ответ от ИИ");
+        throw new Error("Empty response from AI");
       }
     } catch (e: any) {
       console.error(e);
-      setQuizError(e.message || "Ошибка при генерации теста");
+      setQuizError("Не удалось связаться с ИИ. Проверьте соединение.");
     } finally {
       setQuizLoading(false);
     }
   };
 
-  const handleQuizSelection = (index: number) => {
-    if (!quizData || feedback !== 'idle') return;
+  const handleQuizChoice = (index: number) => {
+    if (!quizData || quizData.type !== 'choice' || feedback !== 'idle') return;
 
     if (index === quizData.correctIndex) {
       setFeedback('correct');
@@ -159,12 +167,20 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
     }
   };
 
+  const handleQuizReveal = () => {
+      setFeedback('revealed');
+  };
+
+  // --- RENDERERS ---
+
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-12 glass-panel rounded-[2.5rem] text-center max-w-lg mx-auto mt-10 space-y-6">
         <div className="text-7xl mb-2 drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]">🎉</div>
-        <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-cyan-200">Все готово!</h2>
-        <p className="text-slate-400 text-lg">На данный момент карточки закончились.</p>
+        <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-cyan-200">Сессия завершена!</h2>
+        <p className="text-slate-400 text-lg">
+            {mode === 'flashcards' ? 'Слова повторены.' : mode === 'writing' ? 'Навык письма прокачан.' : 'Правила закреплены.'}
+        </p>
         
         <div className="flex flex-col gap-4 w-full max-w-xs mx-auto pt-4">
           {onInfiniteReview && (
@@ -172,7 +188,7 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
               onClick={onInfiniteReview}
               className="px-8 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold rounded-2xl shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:scale-105 transition-all active:scale-95 flex items-center justify-center gap-2"
             >
-              <span>♾️</span> Тренироваться дальше
+              <span>♾️</span> Продолжить
             </button>
           )}
 
@@ -187,8 +203,6 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
     );
   }
 
-  // --- RENDERING HELPERS ---
-
   const renderProgressBar = () => (
     <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden mb-8">
       <div 
@@ -201,7 +215,9 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
   const renderHeader = () => (
     <div className="flex justify-between items-center px-2 mb-4">
       <div className="flex flex-col">
-        <span className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Прогресс</span>
+        <span className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">
+            {mode === 'flashcards' ? 'Карточки' : mode === 'writing' ? 'Правописание' : 'Грамматика'}
+        </span>
         <div className="flex items-center gap-2">
           <span className="text-cyan-400 font-black text-2xl drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">{currentIndex + 1}</span>
           <span className="text-slate-600 text-xl">/</span>
@@ -218,7 +234,7 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
     </div>
   );
 
-  // --- MODE: GRAMMAR ---
+  // === MODE 1: GRAMMAR (AI TUTOR) ===
   if (mode === 'grammar') {
     const rule = currentItem as Rule;
     return (
@@ -226,51 +242,29 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
         {renderHeader()}
         {renderProgressBar()}
 
-        <div className="glass-panel rounded-[2.5rem] p-8 md:p-12 border border-amber-500/20 relative overflow-hidden min-h-[500px] flex flex-col">
-           {/* Background Deco */}
+        <div className="glass-panel rounded-[2.5rem] p-6 md:p-10 border border-amber-500/20 relative overflow-hidden min-h-[500px] flex flex-col">
            <div className="absolute -right-20 -top-20 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl"></div>
            
            <div className="relative z-10 flex-grow flex flex-col">
               <span className="text-amber-300 text-[10px] font-black uppercase tracking-[0.2em] mb-6 bg-amber-500/10 px-4 py-2 rounded-full border border-amber-500/20 w-fit">
-                 Грамматика • {rule.level}
+                 {rule.title} • {rule.level}
               </span>
 
               {quizError ? (
-                // ERROR VIEW
                 <div className="flex flex-col h-full items-center justify-center text-center animate-in fade-in">
-                  <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center text-red-400 mb-6">
-                    <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
-                  </div>
-                  <h3 className="text-xl font-bold text-white mb-2">Не удалось создать тест</h3>
-                  <p className="text-slate-400 mb-8 max-w-xs">{quizError}</p>
-                  
-                  <div className="flex gap-4 w-full">
-                    <button 
-                      onClick={generateQuiz}
-                      className="flex-1 py-3 bg-cyan-600 hover:bg-cyan-500 text-white rounded-xl font-bold transition-all"
-                    >
-                      Повторить
-                    </button>
-                    <button 
-                      onClick={() => handleAnswer(true)}
-                      className="flex-1 py-3 bg-white/10 hover:bg-white/20 text-white rounded-xl font-bold transition-all"
-                    >
-                      Пропустить
-                    </button>
-                  </div>
+                  <p className="text-red-400 mb-6">{quizError}</p>
+                  <button onClick={generateQuiz} className="px-6 py-3 bg-cyan-600 rounded-xl font-bold">Повторить</button>
+                  <button onClick={() => handleAnswer(true)} className="mt-4 text-sm text-slate-400 underline">Пропустить</button>
                 </div>
               ) : showTheory ? (
-                // THEORY VIEW
+                // THEORY PHASE
                 <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300">
-                  <h3 className="text-3xl font-black text-white mb-6 leading-tight">{rule.title}</h3>
-                  <p className="text-lg text-slate-300 leading-relaxed mb-8 flex-grow">{rule.explanation}</p>
-                  
+                  <p className="text-lg text-slate-300 leading-relaxed mb-8 flex-grow whitespace-pre-line">{rule.explanation}</p>
                   {rule.examples?.[0] && (
                     <div className="bg-black/30 p-6 rounded-2xl border border-white/5 mb-8">
                        <p className="text-amber-100 italic">"{rule.examples[0]}"</p>
                     </div>
                   )}
-
                   <button 
                     onClick={generateQuiz}
                     className="w-full py-5 bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl font-bold text-white text-lg shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] transition-all active:scale-95 flex items-center justify-center gap-3"
@@ -279,59 +273,103 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
                   </button>
                 </div>
               ) : quizLoading ? (
-                // LOADING VIEW
+                // LOADING PHASE
                 <div className="flex flex-col items-center justify-center h-full text-center space-y-6 animate-pulse">
                    <div className="w-16 h-16 border-4 border-amber-500/30 border-t-amber-500 rounded-full animate-spin"></div>
-                   <p className="text-amber-200 font-bold uppercase tracking-widest text-sm">ИИ придумывает ситуацию...</p>
+                   <p className="text-amber-200 font-bold uppercase tracking-widest text-sm">ИИ готовит задание...</p>
                 </div>
               ) : quizData ? (
-                // QUIZ VIEW
+                // QUIZ PHASE
                 <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300">
-                  <h4 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-4">Переведите фразу:</h4>
-                  <p className="text-2xl font-bold text-white mb-8">{quizData.question}</p>
+                  <h4 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-4">{quizData.instruction}</h4>
                   
-                  <div className="bg-black/20 p-6 rounded-2xl border border-white/5 mb-8 text-center">
-                    <p className="text-xl text-amber-100 font-medium">
-                      {quizData.maskedSentence.split('_____').map((part, i, arr) => (
-                        <React.Fragment key={i}>
-                          {part}
-                          {i < arr.length - 1 && (
-                            <span className="inline-block min-w-[60px] border-b-2 border-amber-500/50 mx-1 text-amber-400 px-2">
-                              {feedback !== 'idle' && feedback === 'correct' ? quizData.options[quizData.correctIndex] : '?'}
-                            </span>
-                          )}
-                        </React.Fragment>
-                      ))}
-                    </p>
+                  {/* The Question/Prompt Area */}
+                  <div className="bg-black/20 p-6 rounded-2xl border border-white/5 mb-6 text-center">
+                    {quizData.type === 'choice' ? (
+                        <p className="text-xl text-amber-100 font-medium">
+                        {quizData.question.split('_____').map((part, i, arr) => (
+                            <React.Fragment key={i}>
+                            {part}
+                            {i < arr.length - 1 && (
+                                <span className="inline-block min-w-[60px] border-b-2 border-amber-500/50 mx-1 text-amber-400 px-2 font-bold">
+                                {feedback === 'correct' ? quizData.options?.[quizData.correctIndex!] : '?'}
+                                </span>
+                            )}
+                            </React.Fragment>
+                        ))}
+                        </p>
+                    ) : (
+                        <p className="text-xl font-bold text-white">{quizData.question}</p>
+                    )}
                   </div>
 
-                  <div className="grid gap-3 mt-auto">
-                    {quizData.options.map((option, idx) => (
-                      <button
-                        key={idx}
-                        onClick={() => handleQuizSelection(idx)}
-                        disabled={feedback !== 'idle'}
-                        className={`p-4 rounded-xl font-bold border-2 transition-all text-left
-                           ${feedback === 'idle' 
-                             ? 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-amber-500/50' 
-                             : idx === quizData.correctIndex
-                               ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                               : feedback === 'wrong' && idx !== quizData.correctIndex
-                                 ? 'bg-white/5 border-white/10 opacity-50' // incorrect ones fade out
-                                 : 'bg-white/5 border-white/10'
-                            }
-                           ${feedback === 'wrong' && idx === quizData.correctIndex ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : ''} 
-                        `}
-                      >
-                         {option}
-                      </button>
-                    ))}
-                  </div>
-                  
-                  {feedback === 'wrong' && (
-                     <div className="mt-4 text-center">
-                       <button onClick={() => handleAnswer(false)} className="text-red-400 font-bold underline">Продолжить (повторим позже)</button>
-                     </div>
+                  {/* INTERACTION AREA */}
+                  {quizData.type === 'choice' ? (
+                      // Multiple Choice Buttons
+                      <div className="grid gap-3 mt-auto">
+                        {quizData.options?.map((option, idx) => (
+                        <button
+                            key={idx}
+                            onClick={() => handleQuizChoice(idx)}
+                            disabled={feedback !== 'idle'}
+                            className={`p-4 rounded-xl font-bold border-2 transition-all text-left
+                            ${feedback === 'idle' 
+                                ? 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-amber-500/50' 
+                                : idx === quizData.correctIndex
+                                ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                                : feedback === 'wrong' && idx !== quizData.correctIndex
+                                    ? 'bg-white/5 border-white/10 opacity-30'
+                                    : 'bg-white/5 border-white/10'
+                                }
+                            `}
+                        >
+                            {option}
+                        </button>
+                        ))}
+                        {feedback === 'wrong' && (
+                            <button onClick={() => handleAnswer(false)} className="mt-2 text-red-400 font-bold underline">Далее (Повторить позже)</button>
+                        )}
+                      </div>
+                  ) : (
+                      // Text Input Area for Translate/Question
+                      <div className="flex flex-col flex-grow">
+                          <textarea 
+                             ref={textareaRef}
+                             className="w-full bg-white/5 border border-white/10 rounded-xl p-4 text-white resize-none focus:border-amber-500/50 outline-none mb-4"
+                             rows={3}
+                             placeholder="Type your answer here..."
+                             disabled={feedback === 'revealed'}
+                          />
+                          
+                          {feedback === 'revealed' && (
+                              <div className="animate-in fade-in slide-in-from-top-4 mb-4">
+                                  <div className="text-xs text-emerald-400 font-bold uppercase mb-1">Возможный ответ ИИ:</div>
+                                  <div className="bg-emerald-500/10 border border-emerald-500/30 p-4 rounded-xl text-emerald-100 font-bold">
+                                      {quizData.correctAnswer}
+                                  </div>
+                              </div>
+                          )}
+
+                          <div className="mt-auto">
+                             {feedback === 'idle' ? (
+                                 <button 
+                                   onClick={handleQuizReveal}
+                                   className="w-full py-4 bg-white/10 hover:bg-white/20 border border-white/20 rounded-2xl font-bold text-white transition-all"
+                                 >
+                                   Проверить
+                                 </button>
+                             ) : (
+                                 <div className="grid grid-cols-2 gap-4">
+                                     <button onClick={() => handleAnswer(false)} className="py-4 bg-red-500/20 border border-red-500/30 text-red-300 font-bold rounded-2xl hover:bg-red-500/30">
+                                         Я ошибся
+                                     </button>
+                                     <button onClick={() => handleAnswer(true)} className="py-4 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 font-bold rounded-2xl hover:bg-emerald-500/30">
+                                         Я был прав
+                                     </button>
+                                 </div>
+                             )}
+                          </div>
+                      </div>
                   )}
                 </div>
               ) : null}
@@ -341,17 +379,17 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
     );
   }
 
-  // --- MODE: STANDARD & WRITING (Cards) ---
-  const card = currentItem as any; // Cast to access card-specific props safely inside JSX if needed, though most match SRSFields
+  // === CARD BASED MODES (FLASHCARDS & WRITING) ===
+  const card = currentItem as any; 
 
   return (
     <div className="max-w-xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
       {renderHeader()}
       {renderProgressBar()}
 
-      {mode === 'standard' ? (
+      {mode === 'flashcards' ? (
         <>
-          {/* STANDARD FLASHCARD VIEW */}
+          {/* FLASHCARDS VIEW (Simple Flip) */}
           <div 
             onClick={() => setIsFlipped(!isFlipped)}
             className="relative perspective-1000 h-[450px] cursor-pointer group"
@@ -360,15 +398,9 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
               {/* Front Side */}
               <div className="absolute inset-0 backface-hidden safari-front bg-slate-950 rounded-[3rem] flex flex-col items-center justify-center p-12 border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
                  <div className="absolute top-8">
-                    {currentItem.status === CardStatus.Weak ? (
-                      <span className="bg-red-500/10 text-red-400 text-[10px] font-black uppercase tracking-[0.2em] px-4 py-2 rounded-full border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.3)]">
-                        Слабое место
-                      </span>
-                    ) : (
                       <span className="bg-cyan-500/10 text-cyan-300 text-[10px] font-black uppercase tracking-[0.2em] px-4 py-2 rounded-full border border-cyan-500/20 shadow-[0_0_15px_rgba(6,182,212,0.3)]">
                         English
                       </span>
-                    )}
                  </div>
                  
                  <h3 className="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-slate-400 text-center leading-tight tracking-tight drop-shadow-[0_5px_15px_rgba(0,0,0,0.5)]">
@@ -397,7 +429,6 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
             </div>
           </div>
 
-          {/* Actions */}
           <div className={`grid grid-cols-2 gap-6 transition-all duration-500 ${isFlipped ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-10 pointer-events-none'}`}>
             <button 
               onClick={(e) => { e.stopPropagation(); handleAnswer(false); }}
@@ -415,8 +446,8 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
         </>
       ) : (
         <>
-          {/* WRITING MODE VIEW */}
-          <div className="glass-panel rounded-[3rem] p-8 md:p-12 border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col items-center relative overflow-hidden">
+          {/* WRITING MODE VIEW (Strict Input) */}
+          <div className="glass-panel rounded-[3rem] p-8 md:p-12 border border-purple-500/20 shadow-[0_20px_50px_rgba(0,0,0,0.5)] flex flex-col items-center relative overflow-hidden">
              <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-purple-500 to-pink-500"></div>
              
              <span className="text-purple-300 text-[10px] font-black uppercase tracking-[0.2em] mb-8 bg-purple-500/10 px-4 py-2 rounded-full border border-purple-500/20">
@@ -435,13 +466,13 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
                    value={inputValue}
                    onChange={(e) => setFeedback('idle') || setInputValue(e.target.value)}
                    disabled={feedback !== 'idle'}
+                   autoComplete="off"
                    className={`w-full bg-black/30 border-2 rounded-2xl px-6 py-5 text-xl font-bold text-center text-white placeholder-slate-500 focus:outline-none transition-all
                      ${feedback === 'correct' ? 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 
                        feedback === 'wrong' ? 'border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 
                        'border-white/10 focus:border-purple-400 focus:shadow-[0_0_20px_rgba(192,132,252,0.3)]'}`}
                    placeholder="На английском..."
                  />
-                 
                  {feedback === 'correct' && (
                    <div className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-400 text-2xl animate-bounce">✓</div>
                  )}
@@ -480,33 +511,12 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
       )}
 
       <style>{`
-        .perspective-1000 { 
-          perspective: 1000px; 
-          -webkit-perspective: 1000px;
-        }
-        .transform-style-3d { 
-          transform-style: preserve-3d; 
-          -webkit-transform-style: preserve-3d;
-        }
-        .backface-hidden { 
-          backface-visibility: hidden; 
-          -webkit-backface-visibility: hidden; 
-        }
-        
-        /* FIX FOR SAFARI MIRRORING */
-        .safari-front {
-          transform: rotateY(0deg) translateZ(1px);
-          -webkit-transform: rotateY(0deg) translateZ(1px);
-        }
-        .safari-back {
-          transform: rotateY(180deg) translateZ(1px);
-          -webkit-transform: rotateY(180deg) translateZ(1px);
-        }
-
-        .rotate-y-180 { 
-          transform: rotateY(180deg); 
-          -webkit-transform: rotateY(180deg);
-        }
+        .perspective-1000 { perspective: 1000px; -webkit-perspective: 1000px; }
+        .transform-style-3d { transform-style: preserve-3d; -webkit-transform-style: preserve-3d; }
+        .backface-hidden { backface-visibility: hidden; -webkit-backface-visibility: hidden; }
+        .safari-front { transform: rotateY(0deg) translateZ(1px); -webkit-transform: rotateY(0deg) translateZ(1px); }
+        .safari-back { transform: rotateY(180deg) translateZ(1px); -webkit-transform: rotateY(180deg) translateZ(1px); }
+        .rotate-y-180 { transform: rotateY(180deg); -webkit-transform: rotateY(180deg); }
       `}</style>
     </div>
   );

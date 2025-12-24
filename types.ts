@@ -12,6 +12,8 @@ export enum ItemType {
   Rule = 'Rule'
 }
 
+export type ReviewMode = 'flashcards' | 'writing' | 'grammar';
+
 export interface SRSFields {
   status: CardStatus;
   viewCount: number;
