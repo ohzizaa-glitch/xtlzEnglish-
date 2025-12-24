@@ -100,9 +100,10 @@ export interface LessonSlide {
 export interface ExerciseData {
   type: 'match' | 'scramble' | 'select' | 'audio_select' | 'input';
   question: string;
-  correctAnswer: string;
+  correctAnswer: string; // For input, this is the expected string
   options?: string[]; // For select/match
   audioText?: string; // For audio_select
+  scrambleLetters?: string[]; // For scramble
 }
 
 export interface StaticLesson {

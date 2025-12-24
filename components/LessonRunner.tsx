@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { StudyTopic, Card, Rule, ItemType } from '../types';
 import { LESSON_CONTENT } from '../lib/static-content';
 
@@ -13,16 +13,20 @@ interface LessonRunnerProps {
 const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveContent, onBack }) => {
   const [currentSlideIndex, setCurrentSlideIndex] = useState(0);
   const [selectedWords, setSelectedWords] = useState<Set<string>>(new Set());
+  const [isAdminMode, setIsAdminMode] = useState(false);
   
   // Exercise State (Queue based)
   const [exerciseQueue, setExerciseQueue] = useState<any[]>([]);
   const [exerciseFeedback, setExerciseFeedback] = useState<'idle' | 'correct' | 'wrong'>('idle');
   const [scrambleInput, setScrambleInput] = useState<string[]>([]);
+  const [textInput, setTextInput] = useState(''); // New state for input exercises
   
   // Quiz State
   const [currentQuizIndex, setCurrentQuizIndex] = useState(0);
   const [quizScore, setQuizScore] = useState(0);
   const [quizAnswered, setQuizAnswered] = useState(false);
+
+  const inputRef = useRef<HTMLInputElement>(null);
 
   // Load lesson
   const lesson = LESSON_CONTENT[topic.id];
@@ -34,8 +38,16 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
       setExerciseQueue([...lesson.slides[currentSlideIndex].content.exercises]);
       setExerciseFeedback('idle');
       setScrambleInput([]);
+      setTextInput('');
     }
   }, [currentSlideIndex, lesson]);
+
+  // Focus input on load if exercise is input type
+  useEffect(() => {
+    if (exerciseQueue.length > 0 && exerciseQueue[0].type === 'input') {
+        setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [exerciseQueue]);
 
   // If no static content found, show coming soon
   if (!lesson) {
@@ -64,9 +76,9 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
       // Reset inner states
       setExerciseFeedback('idle');
       setScrambleInput([]);
+      setTextInput('');
       setCurrentQuizIndex(0);
       setQuizAnswered(false);
-      // REMOVED: setQuizScore(0) - caused score to reset before finish screen
     } else {
       onComplete();
     }
@@ -94,6 +106,7 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
   const handleExerciseSubmit = (isCorrect: boolean) => {
     if (isCorrect) {
         setExerciseFeedback('correct');
+        // Play success sound logic could go here
         setTimeout(() => {
             // Remove the completed exercise from queue
             const newQueue = exerciseQueue.slice(1);
@@ -105,8 +118,9 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
                 setExerciseQueue(newQueue);
                 setExerciseFeedback('idle');
                 setScrambleInput([]);
+                setTextInput('');
             }
-        }, 1000);
+        }, isAdminMode ? 100 : 1200); // Faster transition in admin mode
     } else {
         setExerciseFeedback('wrong');
         setTimeout(() => {
@@ -117,7 +131,8 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
             setExerciseQueue(newQueue);
             setExerciseFeedback('idle');
             setScrambleInput([]);
-        }, 1500); // Wait 1.5s so user sees the error
+            setTextInput('');
+        }, 2000); 
     }
   };
 
@@ -127,12 +142,31 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
   
   const resetScramble = () => setScrambleInput([]);
 
+  // --- TEXT PARSER ---
+  const renderMarkdown = (text: string) => {
+      if (!text) return null;
+      // 1. Handle bold: **text** -> <strong>text</strong> (colored)
+      let html = text.replace(/\*\*(.*?)\*\*/g, '<strong class="text-cyan-400 font-bold">$1</strong>');
+      
+      // 2. Handle italics: *text* -> <em>text</em> (colored differently)
+      html = html.replace(/\*(.*?)\*/g, '<em class="text-purple-300 not-italic">$1</em>');
+
+      // 3. Handle line breaks
+      html = html.replace(/\n/g, '<br />');
+
+      return <span dangerouslySetInnerHTML={{ __html: html }} />;
+  };
+
   // --- RENDERERS ---
 
   const renderIntro = (content: any) => (
     <div className="glass-panel p-8 md:p-12 rounded-[2.5rem] animate-in slide-in-from-right-8">
        <h1 className="text-4xl font-black text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-6">{currentSlide.title}</h1>
-       <p className="text-xl text-slate-200 leading-relaxed whitespace-pre-line">{content.text}</p>
+       <div className="text-xl text-slate-200 leading-relaxed space-y-4">
+           {content.text.split('\n\n').map((paragraph: string, i: number) => (
+               <p key={i}>{renderMarkdown(paragraph)}</p>
+           ))}
+       </div>
        <button onClick={nextSlide} className="mt-8 w-full py-4 bg-white/10 hover:bg-white/20 rounded-2xl font-bold text-white transition-all">Продолжить</button>
     </div>
   );
@@ -143,29 +177,30 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
             <span className="bg-blue-500/20 text-blue-300 p-2 rounded-lg text-sm">ABC</span> 
             {currentSlide.title}
         </h2>
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
             <table className="w-full text-left border-collapse">
                 <thead>
-                    <tr className="border-b border-white/10 text-slate-400 text-sm uppercase tracking-wider">
-                        {content.headers.map((h: string, i: number) => <th key={i} className="pb-4 px-2">{h}</th>)}
+                    <tr className="border-b border-white/10 text-slate-400 text-sm uppercase tracking-wider sticky top-0 bg-slate-900 z-10 shadow-lg">
+                        {content.headers.map((h: string, i: number) => <th key={i} className="pb-4 pt-2 px-2 first:rounded-tl-lg last:rounded-tr-lg">{h}</th>)}
                     </tr>
                 </thead>
                 <tbody className="text-lg">
                     {content.rows.map((row: string[], i: number) => (
                         <tr key={i} className="border-b border-white/5 hover:bg-white/5 transition-colors">
-                            <td className="py-4 px-2 font-black text-cyan-300">{row[0]}</td>
-                            <td className="py-4 px-2 font-mono text-slate-300">{row[1]}</td>
-                            <td className="py-4 px-2">{row[2]}</td>
-                            <td className="py-4 px-2 font-mono text-slate-400 text-sm">{row[3]}</td>
-                            <td className="py-4 px-2">
-                                <button onClick={() => playAudio(row[2])} className="text-slate-500 hover:text-cyan-400">🔊</button>
-                            </td>
+                            <td className="py-4 px-2 font-black text-cyan-300">{renderMarkdown(row[0])}</td>
+                            {row.slice(1).map((cell: string, j: number) => (
+                                <td key={j} className="py-4 px-2 text-slate-300">{renderMarkdown(cell)}</td>
+                            ))}
                         </tr>
                     ))}
                 </tbody>
             </table>
         </div>
-        {content.note && <p className="mt-4 text-sm text-slate-500 italic">{content.note}</p>}
+        {content.note && (
+            <div className="mt-6 p-4 bg-white/5 border-l-2 border-cyan-500 rounded-r-xl">
+                <p className="text-sm text-slate-400 italic">{renderMarkdown(content.note)}</p>
+            </div>
+        )}
         <button onClick={nextSlide} className="mt-8 w-full py-4 bg-cyan-600 hover:bg-cyan-500 rounded-2xl font-bold text-white shadow-lg shadow-cyan-500/20">Понятно</button>
     </div>
   );
@@ -173,15 +208,38 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
   const renderList = (content: any) => (
     <div className="glass-panel p-8 rounded-[2.5rem] animate-in slide-in-from-right-8">
         <h2 className="text-2xl font-bold mb-4">{currentSlide.title}</h2>
-        <p className="text-slate-400 mb-6">{content.description}</p>
+        {content.description && <p className="text-slate-400 mb-6">{renderMarkdown(content.description)}</p>}
         
-        <ul className="space-y-4 mb-8">
-            {content.items.map((item: string, i: number) => (
-                <li key={i} className="flex items-start gap-3 text-lg">
-                    <span className="text-cyan-400 mt-1.5 text-xs">●</span>
-                    <span dangerouslySetInnerHTML={{ __html: item.replace(/([A-Z]) —/g, '<strong>$1</strong> —').replace(/"(.*?)"/g, '<span class="text-amber-300">"$1"</span>') }} />
-                </li>
-            ))}
+        <ul className="space-y-2 mb-8">
+            {content.items.map((item: string, i: number) => {
+                // Extract text for audio: **Text**
+                const match = item.match(/\*\*(.*?)\*\*/);
+                const audioText = match ? match[1] : null;
+
+                return (
+                    <li 
+                        key={i} 
+                        onClick={() => audioText && playAudio(audioText)}
+                        className={`flex items-start gap-3 text-lg p-3 rounded-2xl transition-all ${audioText ? 'cursor-pointer hover:bg-white/5 hover:scale-[1.01] active:scale-95' : ''}`}
+                    >
+                        <span className="text-cyan-400 mt-1.5 text-xs">●</span>
+                        <div className="flex-grow">
+                            {renderMarkdown(item)}
+                        </div>
+                         {audioText && (
+                            <button 
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    playAudio(audioText);
+                                }}
+                                className="w-8 h-8 rounded-full bg-white/5 hover:bg-cyan-500 hover:text-white flex items-center justify-center text-slate-400 transition-colors shrink-0"
+                            >
+                                🔊
+                            </button>
+                        )}
+                    </li>
+                );
+            })}
         </ul>
 
         {content.examples && (
@@ -260,28 +318,40 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
   );
 
   const renderExercise = (content: any) => {
-      // Use queue instead of index
       if (exerciseQueue.length === 0) return null;
       const ex = exerciseQueue[0];
-      
       const totalExercises = content.exercises.length;
       const currentProgress = totalExercises - exerciseQueue.length;
 
       return (
-        <div className="glass-panel p-8 rounded-[2.5rem] animate-in slide-in-from-right-8 min-h-[400px] flex flex-col">
+        <div className={`glass-panel p-8 rounded-[2.5rem] animate-in slide-in-from-right-8 min-h-[400px] flex flex-col relative transition-all duration-300 ${exerciseFeedback === 'correct' ? 'shadow-[0_0_30px_rgba(16,185,129,0.3)] border-emerald-500/30 scale-[1.02]' : ''}`}>
+            {exerciseFeedback === 'correct' && (
+                <div className="absolute inset-0 z-50 flex items-center justify-center pointer-events-none">
+                     <div className="text-9xl animate-bounce drop-shadow-[0_0_50px_rgba(16,185,129,0.8)] filter">🎉</div>
+                </div>
+            )}
+            
+            {isAdminMode && (
+                <button
+                    onClick={() => handleExerciseSubmit(true)}
+                    className="absolute top-6 right-6 z-20 px-3 py-1 bg-red-500/20 text-red-300 rounded-full text-xs font-bold border border-red-500/30 hover:bg-red-500/30"
+                >
+                    SKIP (WIN) ⏭
+                </button>
+            )}
+
             <div className="flex justify-between mb-8">
                 <span className="text-xs font-bold uppercase tracking-widest text-purple-400">
-                    Упражнение {Math.min(currentProgress + 1, totalExercises)} / {totalExercises}
+                    Задание {Math.min(currentProgress + 1, totalExercises)} / {totalExercises}
                 </span>
                 <div className="flex gap-1">
-                    {/* Visual Dots: Show completed vs remaining */}
                     {Array.from({ length: totalExercises }).map((_, i) => (
                         <div key={i} className={`w-2 h-2 rounded-full ${i < currentProgress ? 'bg-emerald-500' : i === currentProgress ? 'bg-purple-500' : 'bg-white/10'}`}></div>
                     ))}
                 </div>
             </div>
 
-            <h3 className="text-2xl font-bold text-white mb-8 text-center">{ex.question}</h3>
+            <h3 className="text-2xl font-bold text-white mb-8 text-center">{renderMarkdown(ex.question)}</h3>
 
             <div className="flex-grow flex flex-col justify-center items-center w-full">
                 {/* MATCH / SELECT / AUDIO */}
@@ -297,12 +367,12 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
                                 key={i}
                                 onClick={() => handleExerciseSubmit(opt === ex.correctAnswer)}
                                 disabled={exerciseFeedback !== 'idle'}
-                                className={`p-6 rounded-2xl font-bold text-lg border-2 transition-all
+                                className={`p-6 rounded-2xl font-bold text-lg border-2 transition-all duration-300
                                     ${exerciseFeedback === 'idle' 
-                                        ? 'bg-white/5 border-white/10 hover:border-purple-500/50 hover:bg-white/10' 
+                                        ? 'bg-white/5 border-white/10 hover:border-purple-500/50 hover:bg-white/10 hover:scale-[1.02]' 
                                         : opt === ex.correctAnswer 
-                                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
-                                            : 'opacity-30 border-transparent'
+                                            ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.3)]'
+                                            : 'opacity-30 border-transparent grayscale'
                                     }
                                 `}
                             >
@@ -315,11 +385,11 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
                 {/* SCRAMBLE */}
                 {ex.type === 'scramble' && (
                     <div className="w-full text-center">
-                        <div className="min-h-[80px] flex gap-2 justify-center items-center mb-8 p-4 bg-black/20 rounded-2xl border border-white/10">
+                        <div className="min-h-[80px] flex gap-2 justify-center items-center flex-wrap mb-8 p-4 bg-black/20 rounded-2xl border border-white/10 shadow-inner">
                             {scrambleInput.map((l, i) => (
-                                <span key={i} className="w-12 h-12 flex items-center justify-center bg-white text-black font-black text-xl rounded-xl animate-in zoom-in">{l}</span>
+                                <span key={i} className="px-3 py-2 bg-white text-black font-bold text-lg rounded-lg animate-in zoom-in">{l}</span>
                             ))}
-                            {scrambleInput.length === 0 && <span className="text-slate-500 text-sm">Нажимай на буквы...</span>}
+                            {scrambleInput.length === 0 && <span className="text-slate-500 text-sm">Нажимай на слова...</span>}
                         </div>
                         
                         <div className="flex flex-wrap gap-3 justify-center">
@@ -328,28 +398,77 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
                                      key={i} 
                                      onClick={() => handleScrambleClick(l)}
                                      disabled={exerciseFeedback !== 'idle'}
-                                     className="w-14 h-14 bg-white/10 hover:bg-white/20 rounded-xl font-bold text-xl border border-white/10 active:scale-95 transition-all"
+                                     className="px-4 py-3 bg-white/10 hover:bg-white/20 rounded-xl font-bold text-base border border-white/10 active:scale-95 transition-all"
                                  >
                                      {l}
                                  </button>
                              ))}
                         </div>
                         <div className="flex justify-center gap-4 mt-8">
-                             <button onClick={resetScramble} className="px-6 py-3 text-slate-400 hover:text-white font-bold">Сброс</button>
+                             <button onClick={resetScramble} className="px-6 py-3 text-slate-400 hover:text-white font-bold transition-colors">Сброс</button>
                              <button 
-                                onClick={() => handleExerciseSubmit(scrambleInput.join('').toLowerCase() === ex.correctAnswer.toLowerCase())}
-                                className="px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold shadow-lg"
+                                onClick={() => {
+                                    const inputNormalized = scrambleInput.join('').replace(/\s+/g, '').toLowerCase();
+                                    const answerNormalized = ex.correctAnswer.replace(/\s+/g, '').toLowerCase();
+                                    handleExerciseSubmit(inputNormalized === answerNormalized);
+                                }}
+                                className="px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold shadow-lg transition-all hover:scale-105"
                              >
                                  Проверить
                              </button>
                         </div>
                     </div>
                 )}
+
+                {/* INPUT */}
+                {ex.type === 'input' && (
+                    <div className="w-full max-w-sm">
+                        <input
+                            ref={inputRef}
+                            type="text"
+                            value={textInput}
+                            onChange={(e) => setTextInput(e.target.value)}
+                            onKeyDown={(e) => {
+                                if (e.key === 'Enter' && exerciseFeedback === 'idle' && textInput.trim().length > 0) {
+                                    const inputClean = textInput.trim().toLowerCase().replace(/[.,!?;:]/g, '');
+                                    const answerClean = ex.correctAnswer.trim().toLowerCase().replace(/[.,!?;:]/g, '');
+                                    handleExerciseSubmit(inputClean === answerClean);
+                                }
+                            }}
+                            disabled={exerciseFeedback !== 'idle'}
+                            className={`w-full bg-black/30 border-2 rounded-2xl px-6 py-5 text-xl font-bold text-center text-white placeholder-slate-600 focus:outline-none transition-all
+                                ${exerciseFeedback === 'correct' ? 'border-emerald-500 shadow-[0_0_20px_rgba(16,185,129,0.3)]' : 
+                                exerciseFeedback === 'wrong' ? 'border-red-500 shadow-[0_0_20px_rgba(239,68,68,0.3)]' : 
+                                'border-white/10 focus:border-purple-400 focus:shadow-[0_0_20px_rgba(192,132,252,0.3)]'}`}
+                            placeholder="Введите перевод..."
+                            autoComplete="off"
+                        />
+                        {exerciseFeedback === 'idle' && (
+                            <button 
+                                onClick={() => {
+                                    if (textInput.trim().length === 0) return;
+                                    const inputClean = textInput.trim().toLowerCase().replace(/[.,!?;:]/g, '');
+                                    const answerClean = ex.correctAnswer.trim().toLowerCase().replace(/[.,!?;:]/g, '');
+                                    handleExerciseSubmit(inputClean === answerClean);
+                                }}
+                                className="mt-6 w-full py-4 bg-white/10 hover:bg-white/20 rounded-2xl font-bold text-white transition-all"
+                            >
+                                Проверить
+                            </button>
+                        )}
+                        {exerciseFeedback === 'wrong' && (
+                             <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2">
+                                <p className="text-xs text-red-300 uppercase font-bold mb-1">Правильный ответ:</p>
+                                <p className="text-lg font-black text-white">{ex.correctAnswer}</p>
+                             </div>
+                        )}
+                    </div>
+                )}
             </div>
 
             {exerciseFeedback !== 'idle' && (
                 <div className={`mt-6 text-center font-bold text-lg animate-in fade-in ${exerciseFeedback === 'correct' ? 'text-emerald-400' : 'text-red-400'}`}>
-                    {exerciseFeedback === 'correct' ? 'Правильно! 🎉' : 'Ошибка, попробуй еще раз. (Перенос в конец)'}
+                    {exerciseFeedback === 'correct' ? 'Верно!' : 'Неверно, запомни правильный ответ.'}
                 </div>
             )}
         </div>
@@ -359,7 +478,19 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
   const renderQuiz = (content: any) => {
       const q = content.questions[currentQuizIndex];
       return (
-        <div className="glass-panel p-8 rounded-[2.5rem] animate-in slide-in-from-right-8 min-h-[400px] flex flex-col">
+        <div className="glass-panel p-8 rounded-[2.5rem] animate-in slide-in-from-right-8 min-h-[400px] flex flex-col relative">
+             {isAdminMode && !quizAnswered && (
+                <button
+                    onClick={() => {
+                         setQuizAnswered(true);
+                         setQuizScore(prev => prev + 1);
+                    }}
+                    className="absolute top-6 right-6 z-20 px-3 py-1 bg-red-500/20 text-red-300 rounded-full text-xs font-bold border border-red-500/30 hover:bg-red-500/30"
+                >
+                    AUTO-SOLVE ⏭
+                </button>
+            )}
+
              <div className="flex justify-between items-center mb-8">
                 <h2 className="text-2xl font-bold text-white">Тест</h2>
                 <span className="bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full text-xs font-bold uppercase">
@@ -413,7 +544,6 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
   };
 
   const renderFinish = (content: any) => {
-      // Calculate total questions across all quiz slides in the lesson
       const totalQuestions = lesson.slides.reduce((acc, slide) => {
         if (slide.type === 'quiz') return acc + slide.content.questions.length;
         return acc;
@@ -423,14 +553,16 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
         <div className="glass-panel p-12 rounded-[2.5rem] text-center animate-in zoom-in duration-300">
             <div className="text-7xl mb-6">🏆</div>
             <h2 className="text-3xl font-black text-white mb-4">Урок пройден!</h2>
-            <p className="text-lg text-slate-300 mb-8 max-w-md mx-auto">{content.text}</p>
-            <div className="bg-white/5 p-4 rounded-2xl mb-8 inline-block px-8 border border-white/10">
-                <span className="text-xs text-slate-400 uppercase tracking-widest block mb-2">Результат теста</span>
-                <span className="text-4xl font-black text-emerald-400">
-                    {quizScore} 
-                    <span className="text-xl text-slate-500 font-bold ml-2">/ {totalQuestions}</span>
-                </span>
-            </div>
+            <p className="text-lg text-slate-300 mb-8 max-w-md mx-auto">{renderMarkdown(content.text)}</p>
+            {totalQuestions > 0 && (
+                <div className="bg-white/5 p-4 rounded-2xl mb-8 inline-block px-8 border border-white/10">
+                    <span className="text-xs text-slate-400 uppercase tracking-widest block mb-2">Результат теста</span>
+                    <span className="text-4xl font-black text-emerald-400">
+                        {quizScore} 
+                        <span className="text-xl text-slate-500 font-bold ml-2">/ {totalQuestions}</span>
+                    </span>
+                </div>
+            )}
             <button onClick={onComplete} className="w-full py-4 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-2xl font-bold text-white shadow-lg">
                 Вернуться к карте
             </button>
@@ -440,9 +572,20 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
 
   return (
     <div className="max-w-2xl mx-auto pb-20">
-      {/* Progress Bar */}
-      <div className="w-full h-1 bg-white/5 rounded-full mb-8 overflow-hidden">
-          <div className="h-full bg-cyan-500 transition-all duration-500" style={{ width: `${((currentSlideIndex + 1) / lesson.slides.length) * 100}%` }}></div>
+      {/* Header controls */}
+      <div className="flex justify-between items-center mb-4">
+         <div className="w-full h-1 bg-white/5 rounded-full overflow-hidden flex-grow mr-4">
+            <div className="h-full bg-cyan-500 transition-all duration-500" style={{ width: `${((currentSlideIndex + 1) / lesson.slides.length) * 100}%` }}></div>
+         </div>
+         <label className="flex items-center gap-2 cursor-pointer opacity-50 hover:opacity-100 transition-opacity">
+            <input 
+                type="checkbox" 
+                checked={isAdminMode} 
+                onChange={(e) => setIsAdminMode(e.target.checked)} 
+                className="w-4 h-4 rounded border-slate-600 text-cyan-600 focus:ring-cyan-500 bg-slate-800"
+            />
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Admin</span>
+         </label>
       </div>
 
       {currentSlide.type === 'intro' && renderIntro(currentSlide.content)}
