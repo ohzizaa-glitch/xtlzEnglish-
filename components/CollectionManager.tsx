@@ -53,7 +53,11 @@ const CollectionManager: React.FC<CollectionManagerProps> = ({
     
     setIsAiLoading(true);
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const apiKey = process.env.API_KEY;
+      if (!apiKey) {
+         throw new Error("API Key missing");
+      }
+      const ai = new GoogleGenAI({ apiKey });
       const prompt = `
         Translate the English word/phrase "${front}" into Russian.
         Determine its CEFR level (A1, A2, B1, B2, C1, C2).
@@ -70,7 +74,7 @@ const CollectionManager: React.FC<CollectionManagerProps> = ({
       `;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-2.5-flash',
+        model: 'gemini-3-flash-preview',
         contents: prompt,
         config: {
           responseMimeType: "application/json"
@@ -86,7 +90,7 @@ const CollectionManager: React.FC<CollectionManagerProps> = ({
       }
     } catch (error) {
       console.error("AI Generation Error:", error);
-      alert("Не удалось получить перевод от ИИ. Проверьте соединение или API ключ.");
+      alert("Не удалось получить перевод от ИИ. Проверьте API ключ в настройках.");
     } finally {
       setIsAiLoading(false);
     }
