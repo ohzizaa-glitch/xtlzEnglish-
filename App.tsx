@@ -1,14 +1,17 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Card, Rule, UserProfile, CardStatus, ItemType, ReviewItem } from './types';
 import { INITIAL_CARDS, INITIAL_RULES } from './constants';
 import Dashboard from './components/Dashboard';
 import SRSView from './components/SRSView';
 import CollectionManager from './components/CollectionManager';
-import { getNextReviewBatch, updateCardSRS } from './lib/srs';
+import { getNextReviewBatch, updateCardSRS, getRandomBatch } from './lib/srs';
 
 const App: React.FC = () => {
   const [activeView, setActiveView] = useState<'home' | 'review' | 'collection'>('home');
+  const [isInfiniteMode, setIsInfiniteMode] = useState(false);
+  const [reviewSessionId, setReviewSessionId] = useState(0); // Used to force remount of SRSView
+
   const [cards, setCards] = useState<Card[]>([]);
   const [rules, setRules] = useState<Rule[]>([]);
   const [profile, setProfile] = useState<UserProfile>({
@@ -53,6 +56,18 @@ const App: React.FC = () => {
     localStorage.setItem('lm_profile', JSON.stringify(profile));
   }, [cards, rules, profile]);
 
+  const handleStartReview = () => {
+    setIsInfiniteMode(false);
+    setReviewSessionId(prev => prev + 1);
+    setActiveView('review');
+  };
+
+  const handleStartInfiniteMode = () => {
+    setIsInfiniteMode(true);
+    setReviewSessionId(prev => prev + 1);
+    setActiveView('review');
+  };
+
   const handleCompleteReview = (results: { id: string; remembered: boolean }[]) => {
     let newCards = [...cards];
     let newRules = [...rules];
@@ -75,6 +90,7 @@ const App: React.FC = () => {
     setCards(newCards);
     setRules(newRules);
     updateStats(0, results.length);
+    setIsInfiniteMode(false); // Reset mode after completion
     setActiveView('home');
   };
 
@@ -145,7 +161,13 @@ const App: React.FC = () => {
 
   // Combine both for the review queue
   const combinedItems: ReviewItem[] = [...cards, ...rules];
-  const currentReviewBatch = getNextReviewBatch(combinedItems);
+  
+  const currentReviewBatch = useMemo(() => {
+    if (isInfiniteMode) {
+      return getRandomBatch(combinedItems, 10);
+    }
+    return getNextReviewBatch(combinedItems);
+  }, [cards, rules, isInfiniteMode, reviewSessionId]);
 
   return (
     <div className="min-h-screen pb-24 text-slate-100 font-sans">
@@ -189,15 +211,17 @@ const App: React.FC = () => {
             cards={cards} 
             rules={rules} 
             profile={profile} 
-            onStartReview={() => setActiveView('review')} 
+            onStartReview={handleStartReview} 
           />
         )}
 
         {activeView === 'review' && (
           <SRSView 
+            key={reviewSessionId}
             items={currentReviewBatch} 
             onComplete={handleCompleteReview}
             onCancel={() => setActiveView('home')}
+            onInfiniteReview={handleStartInfiniteMode}
           />
         )}
 
@@ -223,7 +247,7 @@ const App: React.FC = () => {
           </button>
           
           <button 
-            onClick={() => setActiveView('review')} 
+            onClick={handleStartReview} 
             className="w-14 h-14 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center text-white -mt-10 shadow-[0_0_20px_rgba(6,182,212,0.6)] border-4 border-[#0a0a0a] hover:scale-110 transition-transform"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>

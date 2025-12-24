@@ -77,3 +77,11 @@ export const getNextReviewBatch = (items: ReviewItem[], limit: number = 15): Rev
     })
     .slice(0, limit);
 };
+
+export const getRandomBatch = (items: ReviewItem[], limit: number = 10): ReviewItem[] => {
+  if (items.length === 0) return [];
+  // Shuffle array using Fisher-Yates or simple sort
+  return [...items]
+    .sort(() => 0.5 - Math.random())
+    .slice(0, limit);
+};

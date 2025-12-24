@@ -7,6 +7,7 @@ interface SRSViewProps {
   items: ReviewItem[];
   onComplete: (results: { id: string; remembered: boolean }[]) => void;
   onCancel: () => void;
+  onInfiniteReview?: () => void;
 }
 
 type ReviewMode = 'standard' | 'writing' | 'grammar';
@@ -20,7 +21,7 @@ interface GrammarQuizData {
   correctIndex: number;
 }
 
-const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel }) => {
+const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfiniteReview }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
   const [sessionResults, setSessionResults] = useState<{ id: string; remembered: boolean }[]>([]);
@@ -155,16 +156,28 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel }) => {
 
   if (items.length === 0) {
     return (
-      <div className="flex flex-col items-center justify-center p-12 glass-panel rounded-[2.5rem] text-center max-w-lg mx-auto mt-10">
-        <div className="text-7xl mb-6 drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]">🎉</div>
-        <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-cyan-200 mb-4">Все готово!</h2>
-        <p className="text-slate-400 mb-10 text-lg">На данный момент карточки закончились.</p>
-        <button 
-          onClick={onCancel} 
-          className="px-12 py-4 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold rounded-full transition-all hover:scale-105 active:scale-95"
-        >
-          На главную
-        </button>
+      <div className="flex flex-col items-center justify-center p-12 glass-panel rounded-[2.5rem] text-center max-w-lg mx-auto mt-10 space-y-6">
+        <div className="text-7xl mb-2 drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]">🎉</div>
+        <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-cyan-200">Все готово!</h2>
+        <p className="text-slate-400 text-lg">На данный момент карточки закончились.</p>
+        
+        <div className="flex flex-col gap-4 w-full max-w-xs mx-auto pt-4">
+          {onInfiniteReview && (
+            <button 
+              onClick={onInfiniteReview}
+              className="px-8 py-4 bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-bold rounded-2xl shadow-[0_0_20px_rgba(6,182,212,0.4)] hover:scale-105 transition-all active:scale-95 flex items-center justify-center gap-2"
+            >
+              <span>♾️</span> Тренироваться дальше
+            </button>
+          )}
+
+          <button 
+            onClick={onCancel} 
+            className="px-8 py-4 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold rounded-2xl transition-all hover:scale-105 active:scale-95"
+          >
+            На главную
+          </button>
+        </div>
       </div>
     );
   }
