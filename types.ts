@@ -80,6 +80,12 @@ export interface StudyTopic {
   vocabTheme: string; // The specific theme for vocabulary
 }
 
+export interface QuizQuestion {
+  question: string;
+  options: string[];
+  correctIndex: number;
+}
+
 export interface GeneratedLesson {
   rule: {
     title: string;
@@ -92,5 +98,6 @@ export interface GeneratedLesson {
     example: string;
     type: 'Word' | 'Phrase';
   }[];
+  quiz: QuizQuestion[]; // New quiz section
   dialogIntro: string; // Context for the practice dialog
 }

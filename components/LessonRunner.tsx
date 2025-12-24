@@ -10,12 +10,20 @@ interface LessonRunnerProps {
   onBack: () => void;
 }
 
-type LessonPhase = 'loading' | 'content' | 'practice' | 'evaluation' | 'success';
+type LessonPhase = 'loading' | 'content' | 'quiz' | 'practice' | 'evaluation' | 'success';
 
 const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveContent, onBack }) => {
   const [phase, setPhase] = useState<LessonPhase>('loading');
   const [lessonData, setLessonData] = useState<GeneratedLesson | null>(null);
   const [selectedWords, setSelectedWords] = useState<Set<number>>(new Set());
+  
+  // Quiz State
+  const [currentQuizIndex, setCurrentQuizIndex] = useState(0);
+  const [quizSelection, setQuizSelection] = useState<number | null>(null);
+  const [isQuizAnswered, setIsQuizAnswered] = useState(false);
+  const [quizScore, setQuizScore] = useState(0);
+
+  // Practice State
   const [userResponse, setUserResponse] = useState('');
   const [aiFeedback, setAiFeedback] = useState<{ passed: boolean; message: string; correction?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -36,14 +44,18 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
         CRITICAL INSTRUCTIONS:
         1. Explain the grammar rule clearly in Russian.
         2. Provide 2-3 English examples for the rule.
-        3. GENERATE EXACTLY ${topic.vocabCount} NEW WORDS/PHRASES.
-        4. The vocabulary MUST be related to the theme: "${topic.vocabTheme}".
-        5. Write a short context/intro for a practice dialog (e.g., "Imagine you are...").
+        3. GENERATE EXACTLY ${topic.vocabCount} NEW WORDS/PHRASES related to: "${topic.vocabTheme}".
+        4. Generate a QUIZ with exactly 5 multiple-choice questions testing this grammar/vocabulary.
+        5. Write a short context/intro for a practice dialog.
 
         Return ONLY JSON:
         {
           "rule": { "title": "...", "explanation": "...", "examples": ["...", "..."] },
-          "words": [ { "front": "English", "back": "Russian", "type": "Word" or "Phrase", "example": "Sentence" }, ... ], // Must have ${topic.vocabCount} items
+          "words": [ { "front": "English", "back": "Russian", "type": "Word" or "Phrase", "example": "Sentence" }, ... ], 
+          "quiz": [ 
+            { "question": "Sentence with missing part or question", "options": ["opt1", "opt2", "opt3"], "correctIndex": 0 }, 
+            ... (5 items)
+          ],
           "dialogIntro": "Context description for practice"
         }
       `;
@@ -79,7 +91,7 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
       setSelectedWords(newSet);
   };
 
-  const handleSaveAndContinue = () => {
+  const handleSaveAndStartQuiz = () => {
     if (!lessonData) return;
     
     // Save Content
@@ -104,7 +116,27 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
     }));
 
     onSaveContent([newRule], newCards);
-    setPhase('practice');
+    setPhase('quiz');
+  };
+
+  const handleQuizOptionClick = (index: number) => {
+    if (isQuizAnswered) return;
+    setQuizSelection(index);
+    setIsQuizAnswered(true);
+    if (index === lessonData?.quiz[currentQuizIndex].correctIndex) {
+        setQuizScore(prev => prev + 1);
+    }
+  };
+
+  const handleNextQuizQuestion = () => {
+      if (!lessonData) return;
+      if (currentQuizIndex < lessonData.quiz.length - 1) {
+          setCurrentQuizIndex(prev => prev + 1);
+          setQuizSelection(null);
+          setIsQuizAnswered(false);
+      } else {
+          setPhase('practice');
+      }
   };
 
   const submitPractice = async () => {
@@ -156,7 +188,7 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
         <div className="text-center">
              <h2 className="text-2xl font-bold text-white mb-2">Генерация урока...</h2>
              <p className="text-slate-400">Тема: {topic.title}</p>
-             <p className="text-emerald-400 text-sm font-bold mt-2">ИИ подбирает {topic.vocabCount} слов по теме "{topic.vocabTheme}"</p>
+             <p className="text-emerald-400 text-sm font-bold mt-2">ИИ подбирает слова и готовит тест...</p>
         </div>
         {error && (
             <div className="text-red-400 bg-red-500/10 p-4 rounded-xl">
@@ -251,11 +283,66 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
               </div>
 
               <button 
-                onClick={handleSaveAndContinue}
+                onClick={handleSaveAndStartQuiz}
                 className="w-full py-5 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-2xl font-bold text-white text-lg shadow-[0_0_30px_rgba(6,182,212,0.4)] hover:scale-[1.02] transition-all"
               >
-                  Сохранить ({selectedWords.size}) и Практиковаться →
+                  Сохранить ({selectedWords.size}) и пройти Тест →
               </button>
+          </div>
+      );
+  }
+
+  if (phase === 'quiz' && lessonData) {
+      const question = lessonData.quiz[currentQuizIndex];
+      return (
+          <div className="max-w-xl mx-auto pb-20 animate-in slide-in-from-right-8">
+              <div className="flex justify-between items-center mb-6">
+                  <h3 className="text-2xl font-bold text-white">Тест</h3>
+                  <span className="bg-amber-500/20 text-amber-300 px-3 py-1 rounded-full text-xs font-bold uppercase">
+                      Вопрос {currentQuizIndex + 1} / {lessonData.quiz.length}
+                  </span>
+              </div>
+
+              <div className="glass-panel p-8 rounded-[2.5rem] relative overflow-hidden min-h-[400px] flex flex-col">
+                  <div className="absolute top-0 left-0 h-1 bg-amber-500 transition-all duration-300" style={{ width: `${((currentQuizIndex + 1) / lessonData.quiz.length) * 100}%` }}></div>
+                  
+                  <div className="flex-grow flex flex-col justify-center">
+                      <h4 className="text-xl font-bold text-white mb-8 text-center">{question.question}</h4>
+                      
+                      <div className="space-y-3">
+                          {question.options.map((opt, idx) => {
+                              let btnClass = "bg-white/5 border-white/10 hover:bg-white/10";
+                              if (isQuizAnswered) {
+                                  if (idx === question.correctIndex) btnClass = "bg-emerald-500/20 border-emerald-500 text-emerald-300";
+                                  else if (idx === quizSelection && idx !== question.correctIndex) btnClass = "bg-red-500/20 border-red-500 text-red-300 opacity-50";
+                                  else btnClass = "bg-white/5 border-white/10 opacity-30";
+                              }
+
+                              return (
+                                  <button
+                                      key={idx}
+                                      onClick={() => handleQuizOptionClick(idx)}
+                                      disabled={isQuizAnswered}
+                                      className={`w-full p-4 rounded-xl border font-bold text-left transition-all ${btnClass}`}
+                                  >
+                                      {opt}
+                                  </button>
+                              );
+                          })}
+                      </div>
+                  </div>
+
+                  {isQuizAnswered && (
+                      <div className="mt-8 animate-in fade-in slide-in-from-bottom-4">
+                          <button 
+                            onClick={handleNextQuizQuestion}
+                            className="w-full py-4 bg-white text-black font-bold rounded-2xl hover:bg-slate-200 transition-colors"
+                          >
+                              {currentQuizIndex < lessonData.quiz.length - 1 ? 'Следующий вопрос →' : 'Перейти к Практике →'}
+                          </button>
+                      </div>
+                  )}
+              </div>
           </div>
       );
   }
@@ -266,7 +353,13 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
               <div className="glass-panel p-8 rounded-[2.5rem] relative overflow-hidden">
                   <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-purple-500 to-pink-500"></div>
                   
-                  <h3 className="text-2xl font-bold text-white mb-4">Практика</h3>
+                  <div className="flex justify-between items-start mb-4">
+                      <h3 className="text-2xl font-bold text-white">Практика</h3>
+                      <span className="text-xs bg-emerald-500/20 text-emerald-300 px-3 py-1 rounded-full font-bold">
+                          Тест: {quizScore}/{lessonData?.quiz.length}
+                      </span>
+                  </div>
+                  
                   <p className="text-slate-300 mb-6">{lessonData?.dialogIntro}</p>
 
                   <div className="bg-white/5 p-4 rounded-2xl mb-6 border border-white/10">
