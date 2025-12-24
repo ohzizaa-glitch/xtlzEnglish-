@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { StudyTopic, GeneratedLesson, Card, Rule, ItemType } from '../types';
-import { createAIClient, getFriendlyErrorMessage } from '../lib/gemini';
+import { generateText, getFriendlyErrorMessage } from '../lib/gemini';
 
 interface LessonRunnerProps {
   topic: StudyTopic;
@@ -36,8 +36,6 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
     setPhase('loading');
     setError(null);
     try {
-      const ai = createAIClient();
-      // Using gemini-2.0-flash-exp explicitly to avoid rate limits on preview models
       const prompt = `
         Create an English lesson for the topic: "${topic.title}" (Level ${topic.level}).
         Grammar Focus: ${topic.description}.
@@ -61,14 +59,11 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
         }
       `;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
-        contents: prompt,
-        config: { responseMimeType: "application/json" }
-      });
+      // Use universal AI
+      const text = await generateText(prompt, true);
 
-      if (response.text) {
-        const data = JSON.parse(response.text);
+      if (text) {
+        const data = JSON.parse(text);
         setLessonData(data);
         // Select all words by default
         setSelectedWords(new Set(data.words.map((_: any, i: number) => i)));
@@ -145,7 +140,6 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
     setPhase('evaluation');
 
     try {
-      const ai = createAIClient();
       const prompt = `
         Topic: ${topic.title}. 
         Rule taught: ${lessonData.rule.title}.
@@ -162,14 +156,11 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
         }
       `;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
-        contents: prompt,
-        config: { responseMimeType: "application/json" }
-      });
+      // Use universal AI
+      const text = await generateText(prompt, true);
 
-      if (response.text) {
-        const result = JSON.parse(response.text);
+      if (text) {
+        const result = JSON.parse(text);
         setAiFeedback(result);
         if (result.passed) {
              setPhase('success');

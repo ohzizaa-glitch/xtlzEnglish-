@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Card, Rule, ItemType, CardStatus } from '../types';
 import { LEVELS } from '../constants';
-import { createAIClient, getFriendlyErrorMessage } from '../lib/gemini';
+import { generateText, getFriendlyErrorMessage } from '../lib/gemini';
 
 interface CollectionManagerProps {
   cards: Card[];
@@ -53,8 +53,6 @@ const CollectionManager: React.FC<CollectionManagerProps> = ({
     
     setIsAiLoading(true);
     try {
-      const ai = createAIClient();
-      
       const prompt = `
         Translate the English word/phrase "${front}" into Russian.
         Determine its CEFR level (A1, A2, B1, B2, C1, C2).
@@ -70,16 +68,11 @@ const CollectionManager: React.FC<CollectionManagerProps> = ({
         }
       `;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
-        contents: prompt,
-        config: {
-          responseMimeType: "application/json"
-        }
-      });
-
-      if (response.text) {
-        const data = JSON.parse(response.text);
+      // Use the universal function
+      const text = await generateText(prompt, true);
+      
+      if (text) {
+        const data = JSON.parse(text);
         setBack(data.translation);
         setLevel(data.level);
         setExample(data.example);

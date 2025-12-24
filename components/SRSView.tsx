@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { ReviewItem, CardStatus, ItemType, Rule, ReviewMode } from '../types';
-import { createAIClient, getFriendlyErrorMessage } from '../lib/gemini';
+import { generateText, getFriendlyErrorMessage } from '../lib/gemini';
 
 interface SRSViewProps {
   items: ReviewItem[];
@@ -101,7 +101,6 @@ const SRSView: React.FC<SRSViewProps> = ({ items, mode, onComplete, onCancel, on
 
     try {
       const rule = currentItem as Rule;
-      const ai = createAIClient();
       
       let promptTask = "";
       
@@ -145,14 +144,11 @@ const SRSView: React.FC<SRSViewProps> = ({ items, mode, onComplete, onCancel, on
         }
       `;
 
-      const response = await ai.models.generateContent({
-        model: 'gemini-2.0-flash-exp',
-        contents: prompt,
-        config: { responseMimeType: "application/json" }
-      });
+      // Use universal AI
+      const text = await generateText(prompt, true);
 
-      if (response.text) {
-        setQuizData(JSON.parse(response.text));
+      if (text) {
+        setQuizData(JSON.parse(text));
         // Auto-focus text area if not choice
         if (mode !== 'grammar_choice') {
             setTimeout(() => textareaRef.current?.focus(), 100);
