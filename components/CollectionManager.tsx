@@ -10,7 +10,7 @@ interface CollectionManagerProps {
   onAddCard: (card: Omit<Card, 'id' | 'status' | 'viewCount' | 'successCount' | 'errorCount' | 'lastShownDate' | 'consecutiveSuccesses'>) => void;
   onUpdateCard: (card: Card) => void;
   onDeleteCard: (id: string) => void;
-  onAddRule: (rule: Omit<Rule, 'id'>) => void;
+  onAddRule: (rule: Omit<Rule, 'id' | 'status' | 'viewCount' | 'successCount' | 'errorCount' | 'lastShownDate' | 'consecutiveSuccesses'>) => void;
   onUpdateRule: (rule: Rule) => void;
   onDeleteRule: (id: string) => void;
 }
@@ -89,16 +89,24 @@ const CollectionManager: React.FC<CollectionManagerProps> = ({
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (activeTab === 'cards') {
+      const cardType = type as ItemType.Word | ItemType.Phrase;
       if (editingItem && 'front' in editingItem) {
-        onUpdateCard({ ...editingItem, front, back, example, level, type });
+        onUpdateCard({ ...editingItem, front, back, example, level, type: cardType });
       } else {
-        onAddCard({ front, back, example, level, type, tags: [], isFavorite: false, relatedRuleIds: [] });
+        onAddCard({ front, back, example, level, type: cardType, tags: [], isFavorite: false, relatedRuleIds: [] });
       }
     } else {
       if (editingItem && 'title' in editingItem) {
         onUpdateRule({ ...editingItem, title: ruleTitle, explanation, level, examples: example ? [example] : [] });
       } else {
-        onAddRule({ title: ruleTitle, explanation, level, isFavorite: false, examples: example ? [example] : [] });
+        onAddRule({ 
+            title: ruleTitle, 
+            explanation, 
+            level, 
+            isFavorite: false, 
+            examples: example ? [example] : [],
+            type: ItemType.Rule
+        });
       }
     }
     resetForm();

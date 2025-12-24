@@ -76,28 +76,36 @@ export interface StudyTopic {
   level: 'A1' | 'A2' | 'B1' | 'B2' | 'C1';
   description: string;
   order: number;
-  vocabCount: number; // How many words AI should generate
-  vocabTheme: string; // The specific theme for vocabulary
+  vocabCount: number; 
+  vocabTheme: string; 
 }
 
-export interface QuizQuestion {
+// --- STATIC LESSON CONTENT TYPES ---
+
+export type SlideType = 
+  | 'intro'       // Title + Text
+  | 'table'       // Columns of data
+  | 'list'        // Bullet points
+  | 'vocab'       // The learning cards
+  | 'exercise'    // Interactive task
+  | 'quiz'        // Final test
+  | 'finish';     // Summary
+
+export interface LessonSlide {
+  type: SlideType;
+  title: string;
+  content?: any; // Flexible content based on type
+}
+
+export interface ExerciseData {
+  type: 'match' | 'scramble' | 'select' | 'audio_select' | 'input';
   question: string;
-  options: string[];
-  correctIndex: number;
+  correctAnswer: string;
+  options?: string[]; // For select/match
+  audioText?: string; // For audio_select
 }
 
-export interface GeneratedLesson {
-  rule: {
-    title: string;
-    explanation: string;
-    examples: string[];
-  };
-  words: {
-    front: string;
-    back: string;
-    example: string;
-    type: 'Word' | 'Phrase';
-  }[];
-  quiz: QuizQuestion[]; // New quiz section
-  dialogIntro: string; // Context for the practice dialog
+export interface StaticLesson {
+  id: string; // matches topic.id
+  slides: LessonSlide[];
 }

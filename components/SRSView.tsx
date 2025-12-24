@@ -481,7 +481,7 @@ const SRSView: React.FC<SRSViewProps> = ({ items, mode, onComplete, onCancel, on
                    ref={inputRef}
                    type="text"
                    value={inputValue}
-                   onChange={(e) => setFeedback('idle') || setInputValue(e.target.value)}
+                   onChange={(e) => { setFeedback('idle'); setInputValue(e.target.value); }}
                    disabled={feedback !== 'idle'}
                    autoComplete="off"
                    className={`w-full bg-black/30 border-2 rounded-2xl px-6 py-5 text-xl font-bold text-center text-white placeholder-slate-500 focus:outline-none transition-all
