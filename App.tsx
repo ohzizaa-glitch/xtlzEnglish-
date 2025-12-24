@@ -1,15 +1,19 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Card, Rule, UserProfile, CardStatus, ItemType, ReviewItem, ReviewMode } from './types';
+import { Card, Rule, UserProfile, CardStatus, ItemType, ReviewItem, ReviewMode, StudyTopic } from './types';
 import { INITIAL_CARDS, INITIAL_RULES } from './constants';
 import Dashboard from './components/Dashboard';
 import SRSView from './components/SRSView';
 import CollectionManager from './components/CollectionManager';
+import StudyPath from './components/StudyPath';
+import LessonRunner from './components/LessonRunner';
 import { getNextReviewBatch, updateCardSRS, getRandomBatch } from './lib/srs';
 
 const App: React.FC = () => {
-  const [activeView, setActiveView] = useState<'home' | 'review' | 'collection'>('home');
+  const [activeView, setActiveView] = useState<'home' | 'review' | 'collection' | 'studypath' | 'lesson'>('home');
   const [reviewMode, setReviewMode] = useState<ReviewMode>('flashcards');
+  const [activeTopic, setActiveTopic] = useState<StudyTopic | null>(null);
+  
   const [isInfiniteMode, setIsInfiniteMode] = useState(false);
   const [reviewSessionId, setReviewSessionId] = useState(0); 
 
@@ -20,6 +24,7 @@ const App: React.FC = () => {
     level: 'B1',
     streak: 1,
     lastActiveDate: new Date().toISOString().split('T')[0],
+    completedTopicIds: [],
     stats: []
   });
 
@@ -46,6 +51,8 @@ const App: React.FC = () => {
            p.streak = p.streak > 0 ? p.streak : 1; 
         }
       }
+      // Ensure completedTopicIds exists for old profiles
+      if (!p.completedTopicIds) p.completedTopicIds = [];
       setProfile(p);
     }
   }, []);
@@ -57,6 +64,7 @@ const App: React.FC = () => {
     localStorage.setItem('lm_profile', JSON.stringify(profile));
   }, [cards, rules, profile]);
 
+  // --- REVIEW HANDLERS ---
   const handleStartReview = (mode: ReviewMode) => {
     setReviewMode(mode);
     setIsInfiniteMode(false);
@@ -75,14 +83,11 @@ const App: React.FC = () => {
     let newRules = [...rules];
 
     results.forEach(result => {
-      // Check if it's a card
       const cardIndex = newCards.findIndex(c => c.id === result.id);
       if (cardIndex !== -1) {
         newCards[cardIndex] = updateCardSRS(newCards[cardIndex], result.remembered);
         return;
       }
-
-      // Check if it's a rule
       const ruleIndex = newRules.findIndex(r => r.id === result.id);
       if (ruleIndex !== -1) {
         newRules[ruleIndex] = updateCardSRS(newRules[ruleIndex], result.remembered);
@@ -96,28 +101,7 @@ const App: React.FC = () => {
     setActiveView('home');
   };
 
-  const updateStats = (added: number, repeated: number) => {
-    const today = new Date().toISOString().split('T')[0];
-    setProfile(prev => {
-      const newStats = [...prev.stats];
-      const todayStatIndex = newStats.findIndex(s => s.date === today);
-      
-      if (todayStatIndex >= 0) {
-        newStats[todayStatIndex].addedCount += added;
-        newStats[todayStatIndex].repeatedCount += repeated;
-      } else {
-        newStats.push({ date: today, addedCount: added, repeatedCount: repeated });
-      }
-
-      return {
-        ...prev,
-        lastActiveDate: today,
-        stats: newStats,
-        streak: prev.lastActiveDate !== today ? prev.streak + 1 : prev.streak
-      };
-    });
-  };
-
+  // --- COLLECTION HANDLERS ---
   const handleAddCard = (data: any) => {
     const newCard: Card = {
       ...data,
@@ -161,22 +145,76 @@ const App: React.FC = () => {
     setRules(rules.map(r => r.id === updatedRule.id ? updatedRule : r));
   };
 
-  const currentReviewBatch = useMemo(() => {
-    // FILTER CONTENT BASED ON MODE
-    let itemsToReview: ReviewItem[] = [];
+  const updateStats = (added: number, repeated: number) => {
+    const today = new Date().toISOString().split('T')[0];
+    setProfile(prev => {
+      const newStats = [...prev.stats];
+      const todayStatIndex = newStats.findIndex(s => s.date === today);
+      
+      if (todayStatIndex >= 0) {
+        newStats[todayStatIndex].addedCount += added;
+        newStats[todayStatIndex].repeatedCount += repeated;
+      } else {
+        newStats.push({ date: today, addedCount: added, repeatedCount: repeated });
+      }
 
+      return {
+        ...prev,
+        lastActiveDate: today,
+        stats: newStats,
+        streak: prev.lastActiveDate !== today ? prev.streak + 1 : prev.streak
+      };
+    });
+  };
+
+  // --- LESSON HANDLERS ---
+  const handleOpenStudyPath = () => {
+    setActiveView('studypath');
+  };
+
+  const handleStartLesson = (topic: StudyTopic) => {
+    setActiveTopic(topic);
+    setActiveView('lesson');
+  };
+
+  const handleSaveLessonContent = (newRules: Partial<Rule>[], newCards: Partial<Card>[]) => {
+      newRules.forEach(r => handleAddRule(r));
+      newCards.forEach(c => handleAddCard(c));
+  };
+
+  const handleCompleteLesson = () => {
+      if (activeTopic) {
+          setProfile(prev => ({
+              ...prev,
+              completedTopicIds: [...new Set([...prev.completedTopicIds, activeTopic.id])]
+          }));
+      }
+      setActiveView('studypath');
+  };
+  
+  const handleToggleTopicCompletion = (topicId: string) => {
+    setProfile(prev => {
+      const isCompleted = prev.completedTopicIds.includes(topicId);
+      let newIds;
+      if (isCompleted) {
+        newIds = prev.completedTopicIds.filter(id => id !== topicId);
+      } else {
+        newIds = [...prev.completedTopicIds, topicId];
+      }
+      return { ...prev, completedTopicIds: newIds };
+    });
+  };
+
+  const currentReviewBatch = useMemo(() => {
+    let itemsToReview: ReviewItem[] = [];
     if (reviewMode === 'flashcards' || reviewMode === 'writing') {
         itemsToReview = [...cards];
     } else if (reviewMode.startsWith('grammar')) {
-        // Any grammar mode uses rules
         itemsToReview = [...rules];
     }
 
     if (itemsToReview.length === 0) return [];
-
-    if (isInfiniteMode) {
-      return getRandomBatch(itemsToReview, 10);
-    }
+    if (isInfiniteMode) return getRandomBatch(itemsToReview, 10);
     return getNextReviewBatch(itemsToReview);
   }, [cards, rules, isInfiniteMode, reviewSessionId, reviewMode]);
 
@@ -193,6 +231,7 @@ const App: React.FC = () => {
           <div className="hidden md:flex bg-black/20 rounded-full p-1 border border-white/5">
             {[
               { id: 'home', label: 'Обзор' },
+              { id: 'studypath', label: 'Карта' },
               { id: 'collection', label: 'Библиотека' }
             ].map(tab => (
               <button 
@@ -223,6 +262,7 @@ const App: React.FC = () => {
             rules={rules} 
             profile={profile} 
             onStartReview={handleStartReview} 
+            onOpenStudyPath={handleOpenStudyPath}
           />
         )}
 
@@ -249,6 +289,24 @@ const App: React.FC = () => {
             onDeleteRule={(id) => setRules(rules.filter(r => r.id !== id))}
           />
         )}
+
+        {activeView === 'studypath' && (
+            <StudyPath 
+                completedTopicIds={profile.completedTopicIds}
+                onSelectTopic={handleStartLesson}
+                onBack={() => setActiveView('home')}
+                onToggleCompletion={handleToggleTopicCompletion}
+            />
+        )}
+
+        {activeView === 'lesson' && activeTopic && (
+            <LessonRunner 
+                topic={activeTopic}
+                onComplete={handleCompleteLesson}
+                onSaveContent={handleSaveLessonContent}
+                onBack={() => setActiveView('studypath')}
+            />
+        )}
       </main>
 
       {/* Mobile Nav Bar */}
@@ -258,12 +316,8 @@ const App: React.FC = () => {
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
           </button>
           
-          {/* Mobile central button just returns to dashboard to pick mode */}
-          <button 
-            onClick={() => setActiveView('home')} 
-            className="w-14 h-14 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-full flex items-center justify-center text-white -mt-10 shadow-[0_0_20px_rgba(6,182,212,0.6)] border-4 border-[#0a0a0a] hover:scale-110 transition-transform"
-          >
-             <span className="text-2xl">⚡️</span>
+          <button onClick={() => setActiveView('studypath')} className={`flex flex-col items-center gap-1 transition-colors ${activeView === 'studypath' ? 'text-emerald-400 drop-shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'text-slate-500'}`}>
+             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7" /></svg>
           </button>
           
           <button onClick={() => setActiveView('collection')} className={`flex flex-col items-center gap-1 transition-colors ${activeView === 'collection' ? 'text-cyan-400 drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]' : 'text-slate-500'}`}>

@@ -1,29 +1,29 @@
 
 import React from 'react';
 import { Card, Rule, UserProfile, CardStatus, ItemType, ReviewMode } from '../types';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
+import { CURRICULUM } from '../constants';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface DashboardProps {
   cards: Card[];
   rules: Rule[];
   profile: UserProfile;
   onStartReview: (mode: ReviewMode) => void;
+  onOpenStudyPath: () => void;
 }
 
-const Dashboard: React.FC<DashboardProps> = ({ cards, rules, profile, onStartReview }) => {
+const Dashboard: React.FC<DashboardProps> = ({ cards, rules, profile, onStartReview, onOpenStudyPath }) => {
   const counts = {
     words: cards.filter(c => c.type === ItemType.Word).length,
     phrases: cards.filter(c => c.type === ItemType.Phrase).length,
     rules: rules.length,
     known: cards.filter(c => c.status === CardStatus.Known).length,
     weak: cards.filter(c => c.status === CardStatus.Weak).length,
-    learning: cards.filter(c => c.status === CardStatus.Learning).length,
-    new: cards.filter(c => c.status === CardStatus.New).length
   };
 
   const today = new Date().toISOString().split('T')[0];
   const todayStat = profile.stats.find(s => s.date === today) || { addedCount: 0, repeatedCount: 0 };
-  const dailyGoal = 15; // cards per day goal
+  const dailyGoal = 15; 
   const progressPercent = Math.min(100, Math.round((todayStat.repeatedCount / dailyGoal) * 100));
 
   const chartData = profile.stats.slice(-7).map(s => ({
@@ -31,6 +31,10 @@ const Dashboard: React.FC<DashboardProps> = ({ cards, rules, profile, onStartRev
     repeated: s.repeatedCount,
     added: s.addedCount
   }));
+
+  const completedTopicsCount = profile.completedTopicIds?.length || 0;
+  const totalTopics = CURRICULUM.length;
+  const curriculumProgress = Math.round((completedTopicsCount / totalTopics) * 100);
 
   const wordOfTheDay = cards.length > 0 ? cards[Math.floor(Math.random() * cards.length)] : null;
   const weakCards = cards.filter(c => c.status === CardStatus.Weak).slice(0, 5);
@@ -47,89 +51,85 @@ const Dashboard: React.FC<DashboardProps> = ({ cards, rules, profile, onStartRev
             <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-white via-cyan-100 to-cyan-200">
               Привет, {profile.name}!
             </h1>
-            <p className="text-blue-100/80 text-sm md:text-base">Готов прокачать свой уровень?</p>
+            <p className="text-blue-100/80 text-sm md:text-base">Продолжай движение к цели.</p>
             
             <div className="mt-4 p-4 rounded-2xl bg-black/20 border border-white/5 backdrop-blur-md max-w-md">
                <div className="flex justify-between text-xs font-bold mb-2 uppercase tracking-widest text-cyan-300">
-                 <span>Цель дня</span>
+                 <span>Повторение сегодня</span>
                  <span>{progressPercent}%</span>
                </div>
-               <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden shadow-inner">
+               <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden shadow-inner mb-4">
                   <div className="bg-gradient-to-r from-cyan-400 to-blue-500 h-full shadow-[0_0_10px_rgba(34,211,238,0.5)] transition-all duration-1000" style={{ width: `${progressPercent}%` }}></div>
+               </div>
+
+               <div className="flex justify-between text-xs font-bold mb-2 uppercase tracking-widest text-emerald-300">
+                 <span>План обучения</span>
+                 <span>{curriculumProgress}%</span>
+               </div>
+               <div className="w-full bg-white/10 h-2 rounded-full overflow-hidden shadow-inner">
+                  <div className="bg-gradient-to-r from-emerald-400 to-green-500 h-full shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-1000" style={{ width: `${curriculumProgress}%` }}></div>
                </div>
             </div>
           </div>
         </div>
       </div>
 
+      {/* NEW: Study Path Button */}
+      <button 
+        onClick={onOpenStudyPath}
+        className="w-full group relative p-6 glass-panel rounded-[2rem] hover:bg-white/10 transition-all hover:-translate-y-1 hover:shadow-emerald-500/20 hover:shadow-2xl text-left border-emerald-500/20 flex flex-col items-center justify-center text-center space-y-2"
+      >
+        <span className="text-4xl group-hover:scale-110 transition-transform duration-300">🗺️</span>
+        <h3 className="text-2xl font-bold text-white">Карта Знаний</h3>
+        <p className="text-sm text-slate-400 max-w-md">
+           Пошаговый план от A1 до C1. ИИ создаст персональный урок, проверит знания и сохранит материал.
+        </p>
+        <div className="pt-2 flex items-center gap-2 text-emerald-400 text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
+            Открыть карту <span className="text-lg">→</span>
+        </div>
+      </button>
+
       {/* Main Modes Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <button 
           onClick={() => onStartReview('flashcards')}
-          className="group relative p-6 glass-panel rounded-[2rem] hover:bg-white/10 transition-all hover:-translate-y-1 hover:shadow-cyan-500/20 hover:shadow-2xl text-left border-cyan-500/20 min-h-[160px] flex flex-col"
+          className="group relative p-6 glass-panel rounded-[2rem] hover:bg-white/10 transition-all hover:-translate-y-1 hover:shadow-cyan-500/20 hover:shadow-2xl text-left border-cyan-500/20 min-h-[140px] flex flex-col"
         >
           <div className="absolute top-4 right-4 text-3xl group-hover:scale-110 transition-transform">🎴</div>
-          <h3 className="text-2xl font-bold text-white mb-2">Карточки</h3>
-          <p className="text-sm text-slate-400 leading-relaxed mb-auto">Классический режим. Смотришь слово — вспоминаешь перевод.</p>
-          <div className="mt-4 flex items-center gap-2 text-cyan-400 text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-            Начать <span className="text-lg">→</span>
-          </div>
+          <h3 className="text-xl font-bold text-white mb-2">Карточки</h3>
+          <p className="text-sm text-slate-400 leading-relaxed mb-auto">Повторение слов и фраз.</p>
         </button>
 
         <button 
           onClick={() => onStartReview('writing')}
-          className="group relative p-6 glass-panel rounded-[2rem] hover:bg-white/10 transition-all hover:-translate-y-1 hover:shadow-purple-500/20 hover:shadow-2xl text-left border-purple-500/20 min-h-[160px] flex flex-col"
+          className="group relative p-6 glass-panel rounded-[2rem] hover:bg-white/10 transition-all hover:-translate-y-1 hover:shadow-purple-500/20 hover:shadow-2xl text-left border-purple-500/20 min-h-[140px] flex flex-col"
         >
           <div className="absolute top-4 right-4 text-3xl group-hover:scale-110 transition-transform">✍️</div>
-          <h3 className="text-2xl font-bold text-white mb-2">Правописание</h3>
-          <p className="text-sm text-slate-400 leading-relaxed mb-auto">Тебе дается перевод, ты пишешь оригинал вручную.</p>
-          <div className="mt-4 flex items-center gap-2 text-purple-400 text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-            Начать <span className="text-lg">→</span>
-          </div>
+          <h3 className="text-xl font-bold text-white mb-2">Правописание</h3>
+          <p className="text-sm text-slate-400 leading-relaxed mb-auto">Письменный перевод.</p>
         </button>
       </div>
 
-      {/* AI Tutor Section */}
-      <div className="glass-panel rounded-[2.5rem] p-8 border-amber-500/20 relative overflow-hidden">
-        <div className="absolute top-0 right-0 p-8 opacity-20 pointer-events-none">
-          <span className="text-9xl">🧠</span>
-        </div>
-        
-        <h3 className="text-2xl font-bold text-white mb-2 flex items-center gap-3">
-          <span>ИИ Тренер</span>
-          <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-1 rounded-full border border-amber-500/20 uppercase tracking-widest">Beta</span>
+      {/* AI Tutor Mini-Section */}
+      <div className="glass-panel rounded-[2.5rem] p-6 border-amber-500/20">
+        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+          <span className="text-amber-400">🧠</span> Быстрая тренировка ИИ
         </h3>
-        <p className="text-slate-400 mb-6 max-w-lg">
-          Искусственный интеллект сгенерирует уникальные задания на основе ваших правил грамматики.
-        </p>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <button 
-            onClick={() => onStartReview('grammar_choice')}
-            className="flex flex-col items-center justify-center p-4 bg-white/5 hover:bg-amber-500/10 border border-white/10 hover:border-amber-500/50 rounded-2xl transition-all group"
-          >
-            <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">📝</span>
-            <span className="font-bold text-white text-center">Вставить слово</span>
-            <span className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider">Тест</span>
-          </button>
-
-          <button 
-            onClick={() => onStartReview('grammar_translate')}
-            className="flex flex-col items-center justify-center p-4 bg-white/5 hover:bg-amber-500/10 border border-white/10 hover:border-amber-500/50 rounded-2xl transition-all group"
-          >
-            <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">🔄</span>
-            <span className="font-bold text-white text-center">Перевод</span>
-            <span className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider">RU → EN</span>
-          </button>
-
-          <button 
-            onClick={() => onStartReview('grammar_question')}
-            className="flex flex-col items-center justify-center p-4 bg-white/5 hover:bg-amber-500/10 border border-white/10 hover:border-amber-500/50 rounded-2xl transition-all group"
-          >
-            <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">💬</span>
-            <span className="font-bold text-white text-center">Вопрос</span>
-            <span className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider">Диалог</span>
-          </button>
+        <div className="grid grid-cols-3 gap-3">
+          {[
+            { id: 'grammar_choice', icon: '📝', label: 'Тест' },
+            { id: 'grammar_translate', icon: '🔄', label: 'Перевод' },
+            { id: 'grammar_question', icon: '💬', label: 'Диалог' }
+          ].map(m => (
+            <button 
+              key={m.id}
+              onClick={() => onStartReview(m.id as any)}
+              className="flex flex-col items-center justify-center p-3 bg-white/5 hover:bg-amber-500/10 border border-white/10 hover:border-amber-500/50 rounded-xl transition-all"
+            >
+              <span className="text-2xl mb-1">{m.icon}</span>
+              <span className="text-[10px] font-bold text-slate-300 uppercase">{m.label}</span>
+            </button>
+          ))}
         </div>
       </div>
 
@@ -189,11 +189,10 @@ const Dashboard: React.FC<DashboardProps> = ({ cards, rules, profile, onStartRev
               </div>
             </div>
           )}
-
+          
           {wordOfTheDay && (
             <div className="glass-panel p-8 rounded-[2.5rem] border-amber-500/20 relative overflow-hidden">
-              <div className="absolute -right-10 -top-10 w-32 h-32 bg-amber-500/20 rounded-full blur-3xl"></div>
-              <div className="flex justify-between items-start mb-4 relative z-10">
+                <div className="flex justify-between items-start mb-4 relative z-10">
                 <h3 className="text-amber-400 font-bold uppercase text-xs tracking-[0.2em]">Слово дня</h3>
                 <span className="text-[10px] bg-amber-500/20 text-amber-200 px-3 py-1 rounded-full font-bold border border-amber-500/20">{wordOfTheDay.level}</span>
               </div>
