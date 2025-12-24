@@ -358,7 +358,7 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
           >
             <div className={`w-full h-full transition-transform duration-700 transform-style-3d ${isFlipped ? 'rotate-y-180' : ''}`}>
               {/* Front Side */}
-              <div className="absolute inset-0 backface-hidden glass-panel rounded-[3rem] flex flex-col items-center justify-center p-12 border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+              <div className="absolute inset-0 backface-hidden safari-front glass-panel rounded-[3rem] flex flex-col items-center justify-center p-12 border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
                  <div className="absolute top-8">
                     {currentItem.status === CardStatus.Weak ? (
                       <span className="bg-red-500/10 text-red-400 text-[10px] font-black uppercase tracking-[0.2em] px-4 py-2 rounded-full border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.3)]">
@@ -381,7 +381,7 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
               </div>
 
               {/* Back Side */}
-              <div className="absolute inset-0 backface-hidden rotate-y-180 rounded-[3rem] flex flex-col items-center justify-center p-12 border border-white/20 shadow-[0_20px_50px_rgba(34,211,238,0.15)] bg-gradient-to-br from-cyan-900/80 to-blue-900/80 backdrop-blur-2xl">
+              <div className="absolute inset-0 backface-hidden safari-back rounded-[3rem] flex flex-col items-center justify-center p-12 border border-white/20 shadow-[0_20px_50px_rgba(34,211,238,0.15)] bg-gradient-to-br from-cyan-900/80 to-blue-900/80 backdrop-blur-2xl">
                  <span className="text-cyan-200/50 text-[10px] font-black uppercase tracking-[0.2em] mb-8 absolute top-8">Перевод</span>
                  
                  <h3 className="text-4xl font-bold text-white text-center leading-tight mb-8 drop-shadow-md">
@@ -492,6 +492,17 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
           backface-visibility: hidden; 
           -webkit-backface-visibility: hidden; 
         }
+        
+        /* FIX FOR SAFARI MIRRORING */
+        .safari-front {
+          transform: rotateY(0deg) translateZ(1px);
+          -webkit-transform: rotateY(0deg) translateZ(1px);
+        }
+        .safari-back {
+          transform: rotateY(180deg) translateZ(1px);
+          -webkit-transform: rotateY(180deg) translateZ(1px);
+        }
+
         .rotate-y-180 { 
           transform: rotateY(180deg); 
           -webkit-transform: rotateY(180deg);
