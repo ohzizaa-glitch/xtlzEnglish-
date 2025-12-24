@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Card, Rule, UserProfile, CardStatus, ItemType } from './types';
+import { Card, Rule, UserProfile, CardStatus, ItemType, ReviewItem } from './types';
 import { INITIAL_CARDS, INITIAL_RULES } from './constants';
 import Dashboard from './components/Dashboard';
 import SRSView from './components/SRSView';
@@ -53,16 +53,27 @@ const App: React.FC = () => {
     localStorage.setItem('lm_profile', JSON.stringify(profile));
   }, [cards, rules, profile]);
 
-  const handleCompleteReview = (results: { cardId: string; remembered: boolean }[]) => {
-    const updatedCards = cards.map(card => {
-      const result = results.find(r => r.cardId === card.id);
-      if (result) {
-        return updateCardSRS(card, result.remembered);
+  const handleCompleteReview = (results: { id: string; remembered: boolean }[]) => {
+    let newCards = [...cards];
+    let newRules = [...rules];
+
+    results.forEach(result => {
+      // Check if it's a card
+      const cardIndex = newCards.findIndex(c => c.id === result.id);
+      if (cardIndex !== -1) {
+        newCards[cardIndex] = updateCardSRS(newCards[cardIndex], result.remembered);
+        return;
       }
-      return card;
+
+      // Check if it's a rule
+      const ruleIndex = newRules.findIndex(r => r.id === result.id);
+      if (ruleIndex !== -1) {
+        newRules[ruleIndex] = updateCardSRS(newRules[ruleIndex], result.remembered);
+      }
     });
 
-    setCards(updatedCards);
+    setCards(newCards);
+    setRules(newRules);
     updateStats(0, results.length);
     setActiveView('home');
   };
@@ -115,16 +126,26 @@ const App: React.FC = () => {
   const handleAddRule = (data: any) => {
     const newRule: Rule = {
       ...data,
-      id: Math.random().toString(36).substr(2, 9)
+      id: Math.random().toString(36).substr(2, 9),
+      status: CardStatus.New,
+      viewCount: 0,
+      successCount: 0,
+      errorCount: 0,
+      lastShownDate: null,
+      consecutiveSuccesses: 0,
+      type: ItemType.Rule
     };
     setRules([newRule, ...rules]);
+    updateStats(1, 0); // Count adding rules too
   };
 
   const handleUpdateRule = (updatedRule: Rule) => {
     setRules(rules.map(r => r.id === updatedRule.id ? updatedRule : r));
   };
 
-  const currentReviewBatch = getNextReviewBatch(cards);
+  // Combine both for the review queue
+  const combinedItems: ReviewItem[] = [...cards, ...rules];
+  const currentReviewBatch = getNextReviewBatch(combinedItems);
 
   return (
     <div className="min-h-screen pb-24 text-slate-100 font-sans">
@@ -174,7 +195,7 @@ const App: React.FC = () => {
 
         {activeView === 'review' && (
           <SRSView 
-            cards={currentReviewBatch} 
+            items={currentReviewBatch} 
             onComplete={handleCompleteReview}
             onCancel={() => setActiveView('home')}
           />

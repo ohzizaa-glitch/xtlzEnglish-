@@ -1,54 +1,164 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardStatus } from '../types';
+import { GoogleGenAI } from "@google/genai";
+import { ReviewItem, CardStatus, ItemType, Rule } from '../types';
 
 interface SRSViewProps {
-  cards: Card[];
-  onComplete: (results: { cardId: string; remembered: boolean }[]) => void;
+  items: ReviewItem[];
+  onComplete: (results: { id: string; remembered: boolean }[]) => void;
   onCancel: () => void;
 }
 
-type ReviewMode = 'standard' | 'writing';
+type ReviewMode = 'standard' | 'writing' | 'grammar';
 type FeedbackStatus = 'idle' | 'correct' | 'wrong';
 
-const SRSView: React.FC<SRSViewProps> = ({ cards, onComplete, onCancel }) => {
+interface GrammarQuizData {
+  question: string;
+  correctAnswer: string;
+  maskedSentence: string;
+  options: string[];
+  correctIndex: number;
+}
+
+const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isFlipped, setIsFlipped] = useState(false);
-  const [sessionResults, setSessionResults] = useState<{ cardId: string; remembered: boolean }[]>([]);
+  const [sessionResults, setSessionResults] = useState<{ id: string; remembered: boolean }[]>([]);
   
-  // New states for writing mode
+  // Modes
   const [mode, setMode] = useState<ReviewMode>('standard');
   const [inputValue, setInputValue] = useState('');
   const [feedback, setFeedback] = useState<FeedbackStatus>('idle');
+  
+  // AI Grammar Quiz State
+  const [quizData, setQuizData] = useState<GrammarQuizData | null>(null);
+  const [quizLoading, setQuizLoading] = useState(false);
+  const [showTheory, setShowTheory] = useState(true);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
-  const currentCard = cards[currentIndex];
+  const currentItem = items[currentIndex];
 
-  // Determine mode when card changes
   useEffect(() => {
-    if (!currentCard) return;
+    if (!currentItem) return;
 
-    // Logic: Writing mode only for cards that are NOT 'New'.
-    // 33% chance of writing mode.
-    const shouldWrite = currentCard.status !== CardStatus.New && Math.random() > 0.66;
-    
-    setMode(shouldWrite ? 'writing' : 'standard');
-    setIsFlipped(false);
-    setInputValue('');
     setFeedback('idle');
+    setInputValue('');
+    setIsFlipped(false);
+    setShowTheory(true);
+    setQuizData(null);
 
-    // Auto-focus input if in writing mode
-    if (shouldWrite) {
-      setTimeout(() => inputRef.current?.focus(), 100);
+    // DETERMINE MODE
+    if (currentItem.type === ItemType.Rule) {
+      setMode('grammar');
+    } else {
+      // Logic for cards: Writing mode only for cards that are NOT 'New'.
+      // 33% chance of writing mode.
+      const shouldWrite = currentItem.status !== CardStatus.New && Math.random() > 0.66;
+      setMode(shouldWrite ? 'writing' : 'standard');
+      
+      if (shouldWrite) {
+        setTimeout(() => inputRef.current?.focus(), 100);
+      }
     }
-  }, [currentIndex, currentCard]);
+  }, [currentIndex, currentItem]);
 
-  if (cards.length === 0) {
+  const handleAnswer = (remembered: boolean) => {
+    const newResults = [...sessionResults, { id: currentItem.id, remembered }];
+    setSessionResults(newResults);
+    
+    if (currentIndex < items.length - 1) {
+      setCurrentIndex(currentIndex + 1);
+    } else {
+      onComplete(newResults);
+    }
+  };
+
+  const handleWritingSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (mode !== 'writing') return;
+
+    if (feedback !== 'idle') {
+        if (feedback === 'wrong') handleAnswer(false);
+        return;
+    }
+
+    // Safe cast since we know it's a card in writing mode
+    const card = currentItem as any; 
+    const cleanInput = inputValue.trim().toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g,"");
+    const cleanTarget = card.front.trim().toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g,"");
+
+    if (cleanInput === cleanTarget) {
+      setFeedback('correct');
+      setTimeout(() => handleAnswer(true), 1500);
+    } else {
+      setFeedback('wrong');
+    }
+  };
+
+  const generateQuiz = async () => {
+    if (mode !== 'grammar' || !currentItem) return;
+    
+    setQuizLoading(true);
+    setShowTheory(false);
+
+    try {
+      const rule = currentItem as Rule;
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const prompt = `
+        Create a grammar quiz for the English rule: "${rule.title}".
+        Explanation: "${rule.explanation}".
+        
+        1. Create a simple sentence in Russian that requires this grammar rule to be translated correctly.
+        2. Create the correct English translation using the rule.
+        3. Create a 'masked' version of the English sentence where the key grammatical part is missing (replaced by underscores).
+        4. Provide 3 options for the missing part (1 correct, 2 common mistakes).
+        
+        Return ONLY a JSON object:
+        {
+          "question": "Russian sentence",
+          "correctAnswer": "Full English sentence",
+          "maskedSentence": "I _____ to the store yesterday.",
+          "options": ["go", "went", "gone"],
+          "correctIndex": 1
+        }
+      `;
+
+      const response = await ai.models.generateContent({
+        model: 'gemini-2.5-flash',
+        contents: prompt,
+        config: { responseMimeType: "application/json" }
+      });
+
+      if (response.text) {
+        setQuizData(JSON.parse(response.text));
+      }
+    } catch (e) {
+      console.error(e);
+      // If AI fails, fallback to simple manual review
+      handleAnswer(true); 
+    } finally {
+      setQuizLoading(false);
+    }
+  };
+
+  const handleQuizSelection = (index: number) => {
+    if (!quizData || feedback !== 'idle') return;
+
+    if (index === quizData.correctIndex) {
+      setFeedback('correct');
+      setTimeout(() => handleAnswer(true), 2000);
+    } else {
+      setFeedback('wrong');
+    }
+  };
+
+  if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center p-12 glass-panel rounded-[2.5rem] text-center max-w-lg mx-auto mt-10">
         <div className="text-7xl mb-6 drop-shadow-[0_0_30px_rgba(255,255,255,0.3)]">🎉</div>
         <h2 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white to-cyan-200 mb-4">Все готово!</h2>
-        <p className="text-slate-400 mb-10 text-lg">На данный момент карточки закончились. Отличная работа!</p>
+        <p className="text-slate-400 mb-10 text-lg">На данный момент карточки закончились.</p>
         <button 
           onClick={onCancel} 
           className="px-12 py-4 bg-white/10 hover:bg-white/20 border border-white/20 text-white font-bold rounded-full transition-all hover:scale-105 active:scale-95"
@@ -59,64 +169,143 @@ const SRSView: React.FC<SRSViewProps> = ({ cards, onComplete, onCancel }) => {
     );
   }
 
-  const handleAnswer = (remembered: boolean) => {
-    const newResults = [...sessionResults, { cardId: currentCard.id, remembered }];
-    setSessionResults(newResults);
-    
-    if (currentIndex < cards.length - 1) {
-      setCurrentIndex(currentIndex + 1);
-    } else {
-      onComplete(newResults);
-    }
-  };
+  // --- RENDERING HELPERS ---
 
-  const handleWritingSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (feedback !== 'idle') {
-        // If already showing result, pressing enter moves to next
-        if (feedback === 'wrong') handleAnswer(false);
-        return;
-    }
+  const renderProgressBar = () => (
+    <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden mb-8">
+      <div 
+        className="bg-cyan-500 h-full transition-all duration-500 ease-out shadow-[0_0_15px_rgba(6,182,212,0.8)]" 
+        style={{ width: `${((currentIndex + 1) / items.length) * 100}%` }}
+      />
+    </div>
+  );
 
-    const cleanInput = inputValue.trim().toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g,"");
-    const cleanTarget = currentCard.front.trim().toLowerCase().replace(/[.,/#!$%^&*;:{}=\-_`~()]/g,"");
+  const renderHeader = () => (
+    <div className="flex justify-between items-center px-2 mb-4">
+      <div className="flex flex-col">
+        <span className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Прогресс</span>
+        <div className="flex items-center gap-2">
+          <span className="text-cyan-400 font-black text-2xl drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">{currentIndex + 1}</span>
+          <span className="text-slate-600 text-xl">/</span>
+          <span className="text-slate-500 font-bold text-lg">{items.length}</span>
+        </div>
+      </div>
+      <button 
+        onClick={onCancel} 
+        className="w-10 h-10 flex items-center justify-center rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-all"
+        title="Выйти"
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+      </button>
+    </div>
+  );
 
-    if (cleanInput === cleanTarget) {
-      setFeedback('correct');
-      // Auto advance after short delay
-      setTimeout(() => handleAnswer(true), 1500);
-    } else {
-      setFeedback('wrong');
-    }
-  };
+  // --- MODE: GRAMMAR ---
+  if (mode === 'grammar') {
+    const rule = currentItem as Rule;
+    return (
+      <div className="max-w-xl mx-auto pb-20 animate-in fade-in duration-500">
+        {renderHeader()}
+        {renderProgressBar()}
+
+        <div className="glass-panel rounded-[2.5rem] p-8 md:p-12 border border-amber-500/20 relative overflow-hidden min-h-[500px] flex flex-col">
+           {/* Background Deco */}
+           <div className="absolute -right-20 -top-20 w-64 h-64 bg-amber-500/10 rounded-full blur-3xl"></div>
+           
+           <div className="relative z-10 flex-grow flex flex-col">
+              <span className="text-amber-300 text-[10px] font-black uppercase tracking-[0.2em] mb-6 bg-amber-500/10 px-4 py-2 rounded-full border border-amber-500/20 w-fit">
+                 Грамматика • {rule.level}
+              </span>
+
+              {showTheory ? (
+                // THEORY VIEW
+                <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300">
+                  <h3 className="text-3xl font-black text-white mb-6 leading-tight">{rule.title}</h3>
+                  <p className="text-lg text-slate-300 leading-relaxed mb-8 flex-grow">{rule.explanation}</p>
+                  
+                  {rule.examples?.[0] && (
+                    <div className="bg-black/30 p-6 rounded-2xl border border-white/5 mb-8">
+                       <p className="text-amber-100 italic">"{rule.examples[0]}"</p>
+                    </div>
+                  )}
+
+                  <button 
+                    onClick={generateQuiz}
+                    className="w-full py-5 bg-gradient-to-r from-amber-500 to-orange-600 rounded-2xl font-bold text-white text-lg shadow-[0_0_20px_rgba(245,158,11,0.3)] hover:shadow-[0_0_30px_rgba(245,158,11,0.5)] transition-all active:scale-95 flex items-center justify-center gap-3"
+                  >
+                    <span>⚡️</span> Тренировать с ИИ
+                  </button>
+                </div>
+              ) : quizLoading ? (
+                // LOADING VIEW
+                <div className="flex flex-col items-center justify-center h-full text-center space-y-6 animate-pulse">
+                   <div className="w-16 h-16 border-4 border-amber-500/30 border-t-amber-500 rounded-full animate-spin"></div>
+                   <p className="text-amber-200 font-bold uppercase tracking-widest text-sm">ИИ придумывает ситуацию...</p>
+                </div>
+              ) : quizData ? (
+                // QUIZ VIEW
+                <div className="flex flex-col h-full animate-in slide-in-from-right-4 duration-300">
+                  <h4 className="text-slate-400 text-xs font-bold uppercase tracking-widest mb-4">Переведите фразу:</h4>
+                  <p className="text-2xl font-bold text-white mb-8">{quizData.question}</p>
+                  
+                  <div className="bg-black/20 p-6 rounded-2xl border border-white/5 mb-8 text-center">
+                    <p className="text-xl text-amber-100 font-medium">
+                      {quizData.maskedSentence.split('_____').map((part, i, arr) => (
+                        <React.Fragment key={i}>
+                          {part}
+                          {i < arr.length - 1 && (
+                            <span className="inline-block min-w-[60px] border-b-2 border-amber-500/50 mx-1 text-amber-400 px-2">
+                              {feedback !== 'idle' && feedback === 'correct' ? quizData.options[quizData.correctIndex] : '?'}
+                            </span>
+                          )}
+                        </React.Fragment>
+                      ))}
+                    </p>
+                  </div>
+
+                  <div className="grid gap-3 mt-auto">
+                    {quizData.options.map((option, idx) => (
+                      <button
+                        key={idx}
+                        onClick={() => handleQuizSelection(idx)}
+                        disabled={feedback !== 'idle'}
+                        className={`p-4 rounded-xl font-bold border-2 transition-all text-left
+                           ${feedback === 'idle' 
+                             ? 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-amber-500/50' 
+                             : idx === quizData.correctIndex
+                               ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300'
+                               : feedback === 'wrong' && idx !== quizData.correctIndex
+                                 ? 'bg-white/5 border-white/10 opacity-50' // incorrect ones fade out
+                                 : 'bg-white/5 border-white/10'
+                            }
+                           ${feedback === 'wrong' && idx === quizData.correctIndex ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300' : ''} 
+                        `}
+                      >
+                         {option}
+                      </button>
+                    ))}
+                  </div>
+                  
+                  {feedback === 'wrong' && (
+                     <div className="mt-4 text-center">
+                       <button onClick={() => handleAnswer(false)} className="text-red-400 font-bold underline">Продолжить (повторим позже)</button>
+                     </div>
+                  )}
+                </div>
+              ) : null}
+           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- MODE: STANDARD & WRITING (Cards) ---
+  const card = currentItem as any; // Cast to access card-specific props safely inside JSX if needed, though most match SRSFields
 
   return (
     <div className="max-w-xl mx-auto space-y-8 animate-in fade-in duration-500 pb-20">
-      <div className="flex justify-between items-center px-2">
-        <div className="flex flex-col">
-          <span className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">Прогресс</span>
-          <div className="flex items-center gap-2">
-            <span className="text-cyan-400 font-black text-2xl drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">{currentIndex + 1}</span>
-            <span className="text-slate-600 text-xl">/</span>
-            <span className="text-slate-500 font-bold text-lg">{cards.length}</span>
-          </div>
-        </div>
-        <button 
-          onClick={onCancel} 
-          className="w-10 h-10 flex items-center justify-center rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-all"
-          title="Выйти"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-        </button>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="w-full bg-white/5 h-1 rounded-full overflow-hidden">
-        <div 
-          className="bg-cyan-500 h-full transition-all duration-500 ease-out shadow-[0_0_15px_rgba(6,182,212,0.8)]" 
-          style={{ width: `${((currentIndex + 1) / cards.length) * 100}%` }}
-        />
-      </div>
+      {renderHeader()}
+      {renderProgressBar()}
 
       {mode === 'standard' ? (
         <>
@@ -129,7 +318,7 @@ const SRSView: React.FC<SRSViewProps> = ({ cards, onComplete, onCancel }) => {
               {/* Front Side */}
               <div className="absolute inset-0 backface-hidden glass-panel rounded-[3rem] flex flex-col items-center justify-center p-12 border border-white/10 shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
                  <div className="absolute top-8">
-                    {currentCard.status === CardStatus.Weak ? (
+                    {currentItem.status === CardStatus.Weak ? (
                       <span className="bg-red-500/10 text-red-400 text-[10px] font-black uppercase tracking-[0.2em] px-4 py-2 rounded-full border border-red-500/20 shadow-[0_0_15px_rgba(239,68,68,0.3)]">
                         Слабое место
                       </span>
@@ -141,7 +330,7 @@ const SRSView: React.FC<SRSViewProps> = ({ cards, onComplete, onCancel }) => {
                  </div>
                  
                  <h3 className="text-5xl md:text-6xl font-black text-transparent bg-clip-text bg-gradient-to-br from-white to-slate-400 text-center leading-tight tracking-tight drop-shadow-[0_5px_15px_rgba(0,0,0,0.5)]">
-                    {currentCard.front}
+                    {card.front}
                  </h3>
                  
                  <div className="absolute bottom-10 text-slate-500 text-xs font-bold uppercase tracking-widest animate-pulse">
@@ -154,12 +343,12 @@ const SRSView: React.FC<SRSViewProps> = ({ cards, onComplete, onCancel }) => {
                  <span className="text-cyan-200/50 text-[10px] font-black uppercase tracking-[0.2em] mb-8 absolute top-8">Перевод</span>
                  
                  <h3 className="text-4xl font-bold text-white text-center leading-tight mb-8 drop-shadow-md">
-                    {currentCard.back}
+                    {card.back}
                  </h3>
                  
-                 {currentCard.example && (
+                 {card.example && (
                    <div className="bg-black/30 backdrop-blur-md p-6 rounded-3xl border border-white/10 w-full">
-                     <p className="text-cyan-100 text-lg italic text-center leading-relaxed font-serif">"{currentCard.example}"</p>
+                     <p className="text-cyan-100 text-lg italic text-center leading-relaxed font-serif">"{card.example}"</p>
                    </div>
                  )}
               </div>
@@ -193,7 +382,7 @@ const SRSView: React.FC<SRSViewProps> = ({ cards, onComplete, onCancel }) => {
              </span>
 
              <h3 className="text-3xl font-bold text-white text-center mb-10 drop-shadow-md">
-                {currentCard.back}
+                {card.back}
              </h3>
 
              <form onSubmit={handleWritingSubmit} className="w-full max-w-sm space-y-6">
@@ -219,7 +408,7 @@ const SRSView: React.FC<SRSViewProps> = ({ cards, onComplete, onCancel }) => {
                {feedback === 'wrong' && (
                  <div className="bg-red-500/10 border border-red-500/20 rounded-2xl p-4 text-center animate-in fade-in slide-in-from-top-2">
                    <p className="text-xs text-red-300 uppercase font-bold mb-1">Правильный ответ:</p>
-                   <p className="text-xl font-black text-white">{currentCard.front}</p>
+                   <p className="text-xl font-black text-white">{card.front}</p>
                  </div>
                )}
 

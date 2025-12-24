@@ -12,18 +12,7 @@ export enum ItemType {
   Rule = 'Rule'
 }
 
-export interface Card {
-  id: string;
-  front: string;
-  back: string;
-  example?: string;
-  tags: string[];
-  level: string;
-  type: ItemType;
-  isFavorite: boolean;
-  relatedRuleIds: string[];
-  
-  // SRS Fields
+export interface SRSFields {
   status: CardStatus;
   viewCount: number;
   successCount: number;
@@ -32,14 +21,29 @@ export interface Card {
   consecutiveSuccesses: number;
 }
 
-export interface Rule {
+export interface Card extends SRSFields {
+  id: string;
+  front: string;
+  back: string;
+  example?: string;
+  tags: string[];
+  level: string;
+  type: ItemType.Word | ItemType.Phrase;
+  isFavorite: boolean;
+  relatedRuleIds: string[];
+}
+
+export interface Rule extends SRSFields {
   id: string;
   title: string;
   explanation: string;
   examples: string[];
   level: string;
+  type: ItemType.Rule;
   isFavorite: boolean;
 }
+
+export type ReviewItem = Card | Rule;
 
 export interface DailyStat {
   date: string; // YYYY-MM-DD

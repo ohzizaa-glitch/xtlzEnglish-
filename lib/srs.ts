@@ -1,5 +1,5 @@
 
-import { Card, CardStatus } from '../types';
+import { ReviewItem, CardStatus } from '../types';
 
 /**
  * Priority: Weak > Learning > New > Known
@@ -14,47 +14,47 @@ export const getPriorityValue = (status: CardStatus): number => {
   }
 };
 
-export const updateCardSRS = (card: Card, remembered: boolean): Card => {
+export const updateCardSRS = <T extends ReviewItem>(item: T, remembered: boolean): T => {
   const now = Date.now();
-  const updatedCard = { ...card };
+  const updatedItem = { ...item };
   
-  updatedCard.viewCount += 1;
-  updatedCard.lastShownDate = now;
+  updatedItem.viewCount += 1;
+  updatedItem.lastShownDate = now;
 
   if (remembered) {
-    updatedCard.successCount += 1;
-    updatedCard.consecutiveSuccesses += 1;
+    updatedItem.successCount += 1;
+    updatedItem.consecutiveSuccesses += 1;
     
     // Status Logic:
     // 1. If it was New, it becomes Learning.
     // 2. If it was Weak, it becomes Learning.
     // 3. If it was Learning/Known and reached 3 consecutive successes, it becomes Known.
-    if (updatedCard.consecutiveSuccesses >= 3) {
-      updatedCard.status = CardStatus.Known;
+    if (updatedItem.consecutiveSuccesses >= 3) {
+      updatedItem.status = CardStatus.Known;
     } else {
-      updatedCard.status = CardStatus.Learning;
+      updatedItem.status = CardStatus.Learning;
     }
   } else {
-    updatedCard.errorCount += 1;
-    updatedCard.consecutiveSuccesses = 0;
+    updatedItem.errorCount += 1;
+    updatedItem.consecutiveSuccesses = 0;
     // Always becomes Weak if forgotten
-    updatedCard.status = CardStatus.Weak;
+    updatedItem.status = CardStatus.Weak;
   }
 
-  return updatedCard;
+  return updatedItem;
 };
 
-export const getNextReviewBatch = (cards: Card[], limit: number = 15): Card[] => {
+export const getNextReviewBatch = (items: ReviewItem[], limit: number = 15): ReviewItem[] => {
   const now = Date.now();
   
-  const isReadyForReview = (card: Card) => {
-    if (!card.lastShownDate) return true; // New cards
+  const isReadyForReview = (item: ReviewItem) => {
+    if (!item.lastShownDate) return true; // New items
     
-    const diff = now - card.lastShownDate;
+    const diff = now - item.lastShownDate;
     const hours = diff / (1000 * 60 * 60);
     const days = hours / 24;
 
-    switch (card.status) {
+    switch (item.status) {
       case CardStatus.Weak:
         return hours >= 2; // Show Weak every 2 hours
       case CardStatus.Learning:
@@ -67,7 +67,7 @@ export const getNextReviewBatch = (cards: Card[], limit: number = 15): Card[] =>
     }
   };
 
-  return [...cards]
+  return [...items]
     .filter(isReadyForReview)
     // Sort by priority status and then by how long it has been since last view
     .sort((a, b) => {

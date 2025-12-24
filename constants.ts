@@ -44,9 +44,16 @@ export const INITIAL_RULES: Rule[] = [
   {
     id: 'r1',
     title: 'Present Perfect',
-    explanation: 'Используется для связи прошлого с настоящим. Важен результат, а не время.',
+    explanation: 'Используется для связи прошлого с настоящим. Важен результат, а не время совершения действия.',
     examples: ['I have already finished my work.', 'Have you ever been to London?'],
     level: 'B1',
-    isFavorite: false
+    type: ItemType.Rule,
+    isFavorite: false,
+    status: CardStatus.New,
+    viewCount: 0,
+    successCount: 0,
+    errorCount: 0,
+    lastShownDate: null,
+    consecutiveSuccesses: 0
   }
 ];
