@@ -1,8 +1,8 @@
 
 import React, { useState } from 'react';
-import { GoogleGenAI } from "@google/genai";
 import { Card, Rule, ItemType, CardStatus } from '../types';
 import { LEVELS } from '../constants';
+import { createAIClient } from '../lib/gemini';
 
 interface CollectionManagerProps {
   cards: Card[];
@@ -53,11 +53,8 @@ const CollectionManager: React.FC<CollectionManagerProps> = ({
     
     setIsAiLoading(true);
     try {
-      const apiKey = process.env.API_KEY;
-      if (!apiKey) {
-         throw new Error("API Key missing");
-      }
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = createAIClient();
+      
       const prompt = `
         Translate the English word/phrase "${front}" into Russian.
         Determine its CEFR level (A1, A2, B1, B2, C1, C2).
@@ -90,7 +87,7 @@ const CollectionManager: React.FC<CollectionManagerProps> = ({
       }
     } catch (error) {
       console.error("AI Generation Error:", error);
-      alert("Не удалось получить перевод от ИИ. Проверьте API ключ в настройках.");
+      alert("Не удалось получить перевод от ИИ. Проверьте консоль или настройки API ключа.");
     } finally {
       setIsAiLoading(false);
     }

@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { GoogleGenAI } from "@google/genai";
 import { ReviewItem, CardStatus, ItemType, Rule } from '../types';
+import { createAIClient } from '../lib/gemini';
 
 interface SRSViewProps {
   items: ReviewItem[];
@@ -107,13 +107,9 @@ const SRSView: React.FC<SRSViewProps> = ({ items, onComplete, onCancel, onInfini
     setShowTheory(false);
 
     try {
-      const apiKey = process.env.API_KEY;
-      if (!apiKey) {
-        throw new Error("API Key не найден. Убедитесь, что вы добавили его в настройки.");
-      }
-
       const rule = currentItem as Rule;
-      const ai = new GoogleGenAI({ apiKey });
+      const ai = createAIClient();
+      
       const prompt = `
         Create a grammar quiz for the English rule: "${rule.title}".
         Explanation: "${rule.explanation}".
