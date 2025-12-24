@@ -15,6 +15,7 @@ type LessonPhase = 'loading' | 'content' | 'practice' | 'evaluation' | 'success'
 const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveContent, onBack }) => {
   const [phase, setPhase] = useState<LessonPhase>('loading');
   const [lessonData, setLessonData] = useState<GeneratedLesson | null>(null);
+  const [selectedWords, setSelectedWords] = useState<Set<number>>(new Set());
   const [userResponse, setUserResponse] = useState('');
   const [aiFeedback, setAiFeedback] = useState<{ passed: boolean; message: string; correction?: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +57,8 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
       if (response.text) {
         const data = JSON.parse(response.text);
         setLessonData(data);
+        // Select all words by default
+        setSelectedWords(new Set(data.words.map((_: any, i: number) => i)));
         setPhase('content');
       } else {
         throw new Error("No data received");
@@ -64,6 +67,16 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
       setError("Ошибка генерации урока. Попробуйте еще раз.");
       console.error(e);
     }
+  };
+
+  const toggleWordSelection = (index: number) => {
+      const newSet = new Set(selectedWords);
+      if (newSet.has(index)) {
+          newSet.delete(index);
+      } else {
+          newSet.add(index);
+      }
+      setSelectedWords(newSet);
   };
 
   const handleSaveAndContinue = () => {
@@ -78,7 +91,10 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
         type: ItemType.Rule
     };
 
-    const newCards: Partial<Card>[] = lessonData.words.map(w => ({
+    // Filter only selected words
+    const wordsToSave = lessonData.words.filter((_, i) => selectedWords.has(i));
+
+    const newCards: Partial<Card>[] = wordsToSave.map(w => ({
         front: w.front,
         back: w.back,
         example: w.example,
@@ -178,17 +194,58 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
 
                   {/* Words Section */}
                   <div className="glass-panel p-6 rounded-[2rem]">
-                      <h3 className="text-cyan-400 font-bold uppercase tracking-widest text-xs mb-4">Новые слова ({lessonData.words.length})</h3>
+                      <div className="flex justify-between items-center mb-4">
+                        <h3 className="text-cyan-400 font-bold uppercase tracking-widest text-xs">Новые слова</h3>
+                        <span className="text-xs font-bold bg-white/10 px-2 py-1 rounded-lg text-slate-300">
+                            Выбрано: {selectedWords.size} / {lessonData.words.length}
+                        </span>
+                      </div>
+                      
                       <div className="grid grid-cols-1 gap-3">
-                          {lessonData.words.map((w, i) => (
-                              <div key={i} className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5">
-                                  <div>
-                                      <p className="font-bold text-white">{w.front}</p>
-                                      <p className="text-xs text-slate-500">{w.example}</p>
+                          {lessonData.words.map((w, i) => {
+                              const isSelected = selectedWords.has(i);
+                              return (
+                                  <div 
+                                      key={i} 
+                                      onClick={() => toggleWordSelection(i)}
+                                      className={`flex justify-between items-center p-3 rounded-xl border cursor-pointer transition-all duration-200 group ${
+                                          isSelected 
+                                          ? 'bg-emerald-500/10 border-emerald-500/40 hover:bg-emerald-500/20' 
+                                          : 'bg-white/5 border-white/5 opacity-60 hover:opacity-80 hover:bg-white/10'
+                                      }`}
+                                  >
+                                      <div className="flex items-center gap-4">
+                                          <div className={`w-6 h-6 rounded-full border-2 flex items-center justify-center transition-colors ${
+                                              isSelected 
+                                              ? 'bg-emerald-500 border-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.3)]' 
+                                              : 'border-slate-600 group-hover:border-slate-400'
+                                          }`}>
+                                              {isSelected && <svg className="w-3.5 h-3.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3"><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}
+                                          </div>
+                                          <div>
+                                              <p className={`font-bold transition-colors ${isSelected ? 'text-white' : 'text-slate-400'}`}>{w.front}</p>
+                                              <p className="text-xs text-slate-500">{w.example}</p>
+                                          </div>
+                                      </div>
+                                      <p className={`font-medium text-right transition-colors ${isSelected ? 'text-slate-300' : 'text-slate-600'}`}>{w.back}</p>
                                   </div>
-                                  <p className="text-slate-300 font-medium text-right">{w.back}</p>
-                              </div>
-                          ))}
+                              );
+                          })}
+                      </div>
+                      
+                      <div className="mt-4 flex justify-end">
+                        <button 
+                            onClick={() => {
+                                if (selectedWords.size === lessonData.words.length) {
+                                    setSelectedWords(new Set());
+                                } else {
+                                    setSelectedWords(new Set(lessonData.words.map((_, i) => i)));
+                                }
+                            }}
+                            className="text-xs text-slate-500 hover:text-white underline"
+                        >
+                            {selectedWords.size === lessonData.words.length ? 'Снять выделение' : 'Выбрать все'}
+                        </button>
                       </div>
                   </div>
               </div>
@@ -197,7 +254,7 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
                 onClick={handleSaveAndContinue}
                 className="w-full py-5 bg-gradient-to-r from-cyan-600 to-blue-600 rounded-2xl font-bold text-white text-lg shadow-[0_0_30px_rgba(6,182,212,0.4)] hover:scale-[1.02] transition-all"
               >
-                  Сохранить в библиотеку и Практиковаться →
+                  Сохранить ({selectedWords.size}) и Практиковаться →
               </button>
           </div>
       );
