@@ -35,3 +35,25 @@ export const createAIClient = () => {
   
   return new GoogleGenAI({ apiKey });
 };
+
+export const getFriendlyErrorMessage = (error: any): string => {
+  const msg = error?.message || error?.toString() || '';
+  
+  if (msg.includes('429') || msg.includes('quota') || msg.includes('limit')) {
+    return "⏳ Превышен лимит запросов к ИИ (429). Подождите 1-2 минуты и попробуйте снова.";
+  }
+  
+  if (msg.includes('503') || msg.includes('overloaded')) {
+    return "🤖 Сервер ИИ перегружен. Попробуйте через минуту.";
+  }
+  
+  if (msg.includes('API Key') || msg.includes('403') || msg.includes('permission')) {
+    return "🔑 Ошибка доступа. Проверьте API ключ.";
+  }
+  
+  if (msg.includes('fetch') || msg.includes('network')) {
+    return "🌐 Ошибка сети. Проверьте интернет-соединение.";
+  }
+
+  return "Произошла ошибка при генерации. Попробуйте еще раз.";
+};

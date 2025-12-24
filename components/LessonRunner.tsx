@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { StudyTopic, GeneratedLesson, Card, Rule, ItemType } from '../types';
-import { createAIClient } from '../lib/gemini';
+import { createAIClient, getFriendlyErrorMessage } from '../lib/gemini';
 
 interface LessonRunnerProps {
   topic: StudyTopic;
@@ -61,7 +61,7 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
       `;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.0-flash',
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
@@ -76,8 +76,8 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
         throw new Error("No data received");
       }
     } catch (e: any) {
-      setError("Ошибка генерации урока. Попробуйте еще раз.");
       console.error(e);
+      setError(getFriendlyErrorMessage(e));
     }
   };
 
@@ -162,7 +162,7 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
       `;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.0-flash',
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
@@ -176,8 +176,8 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
         }
       }
     } catch (e) {
-      setError("Ошибка проверки.");
-      setPhase('practice');
+      setError(getFriendlyErrorMessage(e));
+      setPhase('practice'); // Go back to allow retry
     }
   };
 
@@ -191,8 +191,13 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
              <p className="text-emerald-400 text-sm font-bold mt-2">ИИ подбирает слова и готовит тест...</p>
         </div>
         {error && (
-            <div className="text-red-400 bg-red-500/10 p-4 rounded-xl">
-                {error} <button onClick={generateLesson} className="underline ml-2">Повторить</button>
+            <div className="text-red-300 bg-red-500/10 p-6 rounded-2xl max-w-md mx-auto border border-red-500/20">
+                <p className="font-bold mb-2">Ошибка</p>
+                <p className="mb-4">{error}</p>
+                <div className="flex gap-3 justify-center">
+                    <button onClick={onBack} className="text-slate-400 hover:text-white underline text-sm">Назад</button>
+                    <button onClick={generateLesson} className="bg-red-500 hover:bg-red-400 text-white px-4 py-2 rounded-lg font-bold transition-colors">Повторить</button>
+                </div>
             </div>
         )}
       </div>
@@ -374,6 +379,12 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
                     className="w-full h-40 bg-black/30 border border-white/20 rounded-2xl p-5 text-white focus:border-purple-500 focus:shadow-[0_0_20px_rgba(168,85,247,0.3)] outline-none resize-none transition-all"
                     placeholder="Начните писать здесь..."
                   />
+
+                  {error && (
+                       <div className="mt-4 p-4 bg-red-500/10 border border-red-500/20 rounded-xl text-red-300 text-sm">
+                           {error}
+                       </div>
+                  )}
 
                   {aiFeedback && (
                       <div className={`mt-6 p-6 rounded-2xl border ${aiFeedback.passed ? 'bg-emerald-500/10 border-emerald-500/30' : 'bg-red-500/10 border-red-500/30'} animate-in fade-in`}>

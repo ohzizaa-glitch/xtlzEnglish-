@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { ReviewItem, CardStatus, ItemType, Rule, ReviewMode } from '../types';
-import { createAIClient } from '../lib/gemini';
+import { createAIClient, getFriendlyErrorMessage } from '../lib/gemini';
 
 interface SRSViewProps {
   items: ReviewItem[];
@@ -146,7 +146,7 @@ const SRSView: React.FC<SRSViewProps> = ({ items, mode, onComplete, onCancel, on
       `;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.0-flash',
         contents: prompt,
         config: { responseMimeType: "application/json" }
       });
@@ -162,7 +162,7 @@ const SRSView: React.FC<SRSViewProps> = ({ items, mode, onComplete, onCancel, on
       }
     } catch (e: any) {
       console.error(e);
-      setQuizError("Не удалось связаться с ИИ. Проверьте соединение.");
+      setQuizError(getFriendlyErrorMessage(e));
     } finally {
       setQuizLoading(false);
     }

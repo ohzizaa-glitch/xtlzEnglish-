@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Card, Rule, ItemType, CardStatus } from '../types';
 import { LEVELS } from '../constants';
-import { createAIClient } from '../lib/gemini';
+import { createAIClient, getFriendlyErrorMessage } from '../lib/gemini';
 
 interface CollectionManagerProps {
   cards: Card[];
@@ -71,7 +71,7 @@ const CollectionManager: React.FC<CollectionManagerProps> = ({
       `;
 
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-2.0-flash',
         contents: prompt,
         config: {
           responseMimeType: "application/json"
@@ -87,7 +87,7 @@ const CollectionManager: React.FC<CollectionManagerProps> = ({
       }
     } catch (error) {
       console.error("AI Generation Error:", error);
-      alert("Не удалось получить перевод от ИИ. Проверьте консоль или настройки API ключа.");
+      alert(getFriendlyErrorMessage(error));
     } finally {
       setIsAiLoading(false);
     }
