@@ -62,15 +62,15 @@ const Dashboard: React.FC<DashboardProps> = ({ cards, rules, profile, onStartRev
         </div>
       </div>
 
-      {/* Mode Selection */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+      {/* Main Modes Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
         <button 
           onClick={() => onStartReview('flashcards')}
-          className="group relative p-6 glass-panel rounded-[2rem] hover:bg-white/10 transition-all hover:-translate-y-1 hover:shadow-cyan-500/20 hover:shadow-2xl text-left border-cyan-500/20"
+          className="group relative p-6 glass-panel rounded-[2rem] hover:bg-white/10 transition-all hover:-translate-y-1 hover:shadow-cyan-500/20 hover:shadow-2xl text-left border-cyan-500/20 min-h-[160px] flex flex-col"
         >
           <div className="absolute top-4 right-4 text-3xl group-hover:scale-110 transition-transform">🎴</div>
-          <h3 className="text-xl font-bold text-white mb-2">Карточки</h3>
-          <p className="text-sm text-slate-400 leading-relaxed">Классический режим. Смотришь слово — вспоминаешь перевод. Идеально для расширения словаря.</p>
+          <h3 className="text-2xl font-bold text-white mb-2">Карточки</h3>
+          <p className="text-sm text-slate-400 leading-relaxed mb-auto">Классический режим. Смотришь слово — вспоминаешь перевод.</p>
           <div className="mt-4 flex items-center gap-2 text-cyan-400 text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
             Начать <span className="text-lg">→</span>
           </div>
@@ -78,27 +78,59 @@ const Dashboard: React.FC<DashboardProps> = ({ cards, rules, profile, onStartRev
 
         <button 
           onClick={() => onStartReview('writing')}
-          className="group relative p-6 glass-panel rounded-[2rem] hover:bg-white/10 transition-all hover:-translate-y-1 hover:shadow-purple-500/20 hover:shadow-2xl text-left border-purple-500/20"
+          className="group relative p-6 glass-panel rounded-[2rem] hover:bg-white/10 transition-all hover:-translate-y-1 hover:shadow-purple-500/20 hover:shadow-2xl text-left border-purple-500/20 min-h-[160px] flex flex-col"
         >
           <div className="absolute top-4 right-4 text-3xl group-hover:scale-110 transition-transform">✍️</div>
-          <h3 className="text-xl font-bold text-white mb-2">Правописание</h3>
-          <p className="text-sm text-slate-400 leading-relaxed">Хардкор. Тебе дается перевод, ты пишешь оригинал вручную. Закрепляет написание.</p>
+          <h3 className="text-2xl font-bold text-white mb-2">Правописание</h3>
+          <p className="text-sm text-slate-400 leading-relaxed mb-auto">Тебе дается перевод, ты пишешь оригинал вручную.</p>
           <div className="mt-4 flex items-center gap-2 text-purple-400 text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
             Начать <span className="text-lg">→</span>
           </div>
         </button>
+      </div>
 
-        <button 
-          onClick={() => onStartReview('grammar')}
-          className="group relative p-6 glass-panel rounded-[2rem] hover:bg-white/10 transition-all hover:-translate-y-1 hover:shadow-amber-500/20 hover:shadow-2xl text-left border-amber-500/20"
-        >
-          <div className="absolute top-4 right-4 text-3xl group-hover:scale-110 transition-transform">🧠</div>
-          <h3 className="text-xl font-bold text-white mb-2">ИИ Тренер</h3>
-          <p className="text-sm text-slate-400 leading-relaxed">Тренировка правил. ИИ создает тесты, просит перевести предложения и задает вопросы.</p>
-          <div className="mt-4 flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">
-            Начать <span className="text-lg">→</span>
-          </div>
-        </button>
+      {/* AI Tutor Section */}
+      <div className="glass-panel rounded-[2.5rem] p-8 border-amber-500/20 relative overflow-hidden">
+        <div className="absolute top-0 right-0 p-8 opacity-20 pointer-events-none">
+          <span className="text-9xl">🧠</span>
+        </div>
+        
+        <h3 className="text-2xl font-bold text-white mb-2 flex items-center gap-3">
+          <span>ИИ Тренер</span>
+          <span className="text-xs bg-amber-500/20 text-amber-300 px-2 py-1 rounded-full border border-amber-500/20 uppercase tracking-widest">Beta</span>
+        </h3>
+        <p className="text-slate-400 mb-6 max-w-lg">
+          Искусственный интеллект сгенерирует уникальные задания на основе ваших правил грамматики.
+        </p>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <button 
+            onClick={() => onStartReview('grammar_choice')}
+            className="flex flex-col items-center justify-center p-4 bg-white/5 hover:bg-amber-500/10 border border-white/10 hover:border-amber-500/50 rounded-2xl transition-all group"
+          >
+            <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">📝</span>
+            <span className="font-bold text-white text-center">Вставить слово</span>
+            <span className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider">Тест</span>
+          </button>
+
+          <button 
+            onClick={() => onStartReview('grammar_translate')}
+            className="flex flex-col items-center justify-center p-4 bg-white/5 hover:bg-amber-500/10 border border-white/10 hover:border-amber-500/50 rounded-2xl transition-all group"
+          >
+            <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">🔄</span>
+            <span className="font-bold text-white text-center">Перевод</span>
+            <span className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider">RU → EN</span>
+          </button>
+
+          <button 
+            onClick={() => onStartReview('grammar_question')}
+            className="flex flex-col items-center justify-center p-4 bg-white/5 hover:bg-amber-500/10 border border-white/10 hover:border-amber-500/50 rounded-2xl transition-all group"
+          >
+            <span className="text-3xl mb-2 group-hover:scale-110 transition-transform">💬</span>
+            <span className="font-bold text-white text-center">Вопрос</span>
+            <span className="text-[10px] text-slate-500 mt-1 uppercase tracking-wider">Диалог</span>
+          </button>
+        </div>
       </div>
 
       {/* Stats Grid */}

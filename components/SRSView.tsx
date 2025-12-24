@@ -93,7 +93,7 @@ const SRSView: React.FC<SRSViewProps> = ({ items, mode, onComplete, onCancel, on
 
   // --- AI GRAMMAR LOGIC ---
   const generateQuiz = async () => {
-    if (mode !== 'grammar' || !currentItem) return;
+    if (!mode.startsWith('grammar') || !currentItem) return;
     
     setQuizLoading(true);
     setQuizError(null);
@@ -103,26 +103,36 @@ const SRSView: React.FC<SRSViewProps> = ({ items, mode, onComplete, onCancel, on
       const rule = currentItem as Rule;
       const ai = createAIClient();
       
+      let promptTask = "";
+      
+      if (mode === 'grammar_choice') {
+        promptTask = `
+        Create a 'choice' type quiz.
+        1. Create a 'masked' English sentence where the key grammar part is missing (replaced by _____).
+        2. Provide 3 options (1 correct, 2 common mistakes).
+        3. Instruction: "Choose the correct form."
+        `;
+      } else if (mode === 'grammar_translate') {
+        promptTask = `
+        Create a 'translate' type quiz.
+        1. Create a simple Russian sentence that MUST use this grammar rule when translated.
+        2. Provide the correct English translation.
+        3. Instruction: "Translate into English."
+        `;
+      } else if (mode === 'grammar_question') {
+         promptTask = `
+         Create a 'question' type quiz.
+         1. Ask a question in English that forces the user to use this rule in their answer.
+         2. Provide an example of a good correct answer.
+         3. Instruction: "Answer the question in English."
+         `;
+      }
+
       const prompt = `
         You are an English teacher. Create a grammar exercise for the rule: "${rule.title}".
         Explanation: "${rule.explanation}".
         
-        Randomly select ONE of these 3 types: 'choice', 'translate', or 'question'.
-
-        1. Type 'choice':
-           - Create a 'masked' English sentence where the key grammar part is missing (replaced by _____).
-           - Provide 3 options (1 correct, 2 common mistakes).
-           - Instruction: "Choose the correct form."
-        
-        2. Type 'translate':
-           - Create a simple Russian sentence that MUST use this grammar rule when translated.
-           - Provide the correct English translation.
-           - Instruction: "Translate into English."
-
-        3. Type 'question':
-           - Ask a question in English that forces the user to use this rule in their answer.
-           - Provide an example of a good correct answer.
-           - Instruction: "Answer the question in English."
+        ${promptTask}
         
         Return ONLY a JSON object:
         {
@@ -130,8 +140,8 @@ const SRSView: React.FC<SRSViewProps> = ({ items, mode, onComplete, onCancel, on
           "instruction": "Instruction string",
           "question": "The question text (Russian sentence, or English question, or masked sentence)",
           "correctAnswer": "The full correct English sentence or answer",
-          "options": ["opt1", "opt2", "opt3"], // Only for 'choice'
-          "correctIndex": 0 // Only for 'choice'
+          "options": ["opt1", "opt2", "opt3"], // Only for 'choice' type
+          "correctIndex": 0 // Only for 'choice' type
         }
       `;
 
@@ -144,7 +154,9 @@ const SRSView: React.FC<SRSViewProps> = ({ items, mode, onComplete, onCancel, on
       if (response.text) {
         setQuizData(JSON.parse(response.text));
         // Auto-focus text area if not choice
-        setTimeout(() => textareaRef.current?.focus(), 100);
+        if (mode !== 'grammar_choice') {
+            setTimeout(() => textareaRef.current?.focus(), 100);
+        }
       } else {
         throw new Error("Empty response from AI");
       }
@@ -212,30 +224,39 @@ const SRSView: React.FC<SRSViewProps> = ({ items, mode, onComplete, onCancel, on
     </div>
   );
 
-  const renderHeader = () => (
-    <div className="flex justify-between items-center px-2 mb-4">
-      <div className="flex flex-col">
-        <span className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">
-            {mode === 'flashcards' ? 'Карточки' : mode === 'writing' ? 'Правописание' : 'Грамматика'}
-        </span>
-        <div className="flex items-center gap-2">
-          <span className="text-cyan-400 font-black text-2xl drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">{currentIndex + 1}</span>
-          <span className="text-slate-600 text-xl">/</span>
-          <span className="text-slate-500 font-bold text-lg">{items.length}</span>
+  const renderHeader = () => {
+    let title = "";
+    if (mode === 'flashcards') title = 'Карточки';
+    else if (mode === 'writing') title = 'Правописание';
+    else if (mode === 'grammar_choice') title = 'Вставить слово';
+    else if (mode === 'grammar_translate') title = 'Перевод';
+    else if (mode === 'grammar_question') title = 'Ответ на вопрос';
+
+    return (
+      <div className="flex justify-between items-center px-2 mb-4">
+        <div className="flex flex-col">
+          <span className="text-slate-500 text-[10px] font-bold uppercase tracking-[0.2em] mb-1">
+              {title}
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-cyan-400 font-black text-2xl drop-shadow-[0_0_10px_rgba(34,211,238,0.5)]">{currentIndex + 1}</span>
+            <span className="text-slate-600 text-xl">/</span>
+            <span className="text-slate-500 font-bold text-lg">{items.length}</span>
+          </div>
         </div>
+        <button 
+          onClick={onCancel} 
+          className="w-10 h-10 flex items-center justify-center rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-all"
+          title="Выйти"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
       </div>
-      <button 
-        onClick={onCancel} 
-        className="w-10 h-10 flex items-center justify-center rounded-full bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20 transition-all"
-        title="Выйти"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
-      </button>
-    </div>
-  );
+    );
+  };
 
   // === MODE 1: GRAMMAR (AI TUTOR) ===
-  if (mode === 'grammar') {
+  if (mode.startsWith('grammar')) {
     const rule = currentItem as Rule;
     return (
       <div className="max-w-xl mx-auto pb-20 animate-in fade-in duration-500">

@@ -167,7 +167,8 @@ const App: React.FC = () => {
 
     if (reviewMode === 'flashcards' || reviewMode === 'writing') {
         itemsToReview = [...cards];
-    } else if (reviewMode === 'grammar') {
+    } else if (reviewMode.startsWith('grammar')) {
+        // Any grammar mode uses rules
         itemsToReview = [...rules];
     }
 

@@ -12,7 +12,12 @@ export enum ItemType {
   Rule = 'Rule'
 }
 
-export type ReviewMode = 'flashcards' | 'writing' | 'grammar';
+export type ReviewMode = 
+  | 'flashcards' 
+  | 'writing' 
+  | 'grammar_choice' 
+  | 'grammar_translate' 
+  | 'grammar_question';
 
 export interface SRSFields {
   status: CardStatus;
