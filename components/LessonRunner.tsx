@@ -103,6 +103,19 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
     }
   };
 
+  const validateInput = (input: string, correct: string): boolean => {
+    const normalize = (s: string) => s
+        .trim()
+        .toLowerCase()
+        .replace(/[.,!?;:()]/g, '')
+        .replace(/\s+/g, ' '); // Replace multiple spaces with one
+        
+    const inputClean = normalize(input);
+    const correctOptions = correct.split('|').map(opt => normalize(opt));
+    
+    return correctOptions.some(opt => opt === inputClean);
+  };
+
   const handleExerciseSubmit = (isCorrect: boolean) => {
     if (isCorrect) {
         setExerciseFeedback('correct');
@@ -365,12 +378,12 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
                         {ex.options.map((opt: string, i: number) => (
                             <button 
                                 key={i}
-                                onClick={() => handleExerciseSubmit(opt === ex.correctAnswer)}
+                                onClick={() => handleExerciseSubmit(validateInput(opt, ex.correctAnswer))}
                                 disabled={exerciseFeedback !== 'idle'}
                                 className={`p-6 rounded-2xl font-bold text-lg border-2 transition-all duration-300
                                     ${exerciseFeedback === 'idle' 
                                         ? 'bg-white/5 border-white/10 hover:border-purple-500/50 hover:bg-white/10 hover:scale-[1.02]' 
-                                        : opt === ex.correctAnswer 
+                                        : validateInput(opt, ex.correctAnswer) 
                                             ? 'bg-emerald-500/20 border-emerald-500 text-emerald-300 shadow-[0_0_20px_rgba(16,185,129,0.3)]'
                                             : 'opacity-30 border-transparent grayscale'
                                     }
@@ -408,9 +421,8 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
                              <button onClick={resetScramble} className="px-6 py-3 text-slate-400 hover:text-white font-bold transition-colors">Сброс</button>
                              <button 
                                 onClick={() => {
-                                    const inputNormalized = scrambleInput.join('').replace(/\s+/g, '').toLowerCase();
-                                    const answerNormalized = ex.correctAnswer.replace(/\s+/g, '').toLowerCase();
-                                    handleExerciseSubmit(inputNormalized === answerNormalized);
+                                    const inputStr = scrambleInput.join('');
+                                    handleExerciseSubmit(validateInput(inputStr, ex.correctAnswer));
                                 }}
                                 className="px-8 py-3 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold shadow-lg transition-all hover:scale-105"
                              >
@@ -430,9 +442,7 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
                             onChange={(e) => setTextInput(e.target.value)}
                             onKeyDown={(e) => {
                                 if (e.key === 'Enter' && exerciseFeedback === 'idle' && textInput.trim().length > 0) {
-                                    const inputClean = textInput.trim().toLowerCase().replace(/[.,!?;:]/g, '');
-                                    const answerClean = ex.correctAnswer.trim().toLowerCase().replace(/[.,!?;:]/g, '');
-                                    handleExerciseSubmit(inputClean === answerClean);
+                                    handleExerciseSubmit(validateInput(textInput, ex.correctAnswer));
                                 }
                             }}
                             disabled={exerciseFeedback !== 'idle'}
@@ -447,9 +457,7 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
                             <button 
                                 onClick={() => {
                                     if (textInput.trim().length === 0) return;
-                                    const inputClean = textInput.trim().toLowerCase().replace(/[.,!?;:]/g, '');
-                                    const answerClean = ex.correctAnswer.trim().toLowerCase().replace(/[.,!?;:]/g, '');
-                                    handleExerciseSubmit(inputClean === answerClean);
+                                    handleExerciseSubmit(validateInput(textInput, ex.correctAnswer));
                                 }}
                                 className="mt-6 w-full py-4 bg-white/10 hover:bg-white/20 rounded-2xl font-bold text-white transition-all"
                             >
@@ -459,7 +467,7 @@ const LessonRunner: React.FC<LessonRunnerProps> = ({ topic, onComplete, onSaveCo
                         {exerciseFeedback === 'wrong' && (
                              <div className="mt-4 bg-red-500/10 border border-red-500/20 rounded-xl p-4 text-center animate-in fade-in slide-in-from-top-2">
                                 <p className="text-xs text-red-300 uppercase font-bold mb-1">Правильный ответ:</p>
-                                <p className="text-lg font-black text-white">{ex.correctAnswer}</p>
+                                <p className="text-lg font-black text-white">{ex.correctAnswer.split('|')[0].trim()}</p>
                              </div>
                         )}
                     </div>

@@ -122,17 +122,17 @@ export const LESSON_CONTENT: Record<string, StaticLesson> = {
             {
               type: 'input',
               question: 'Переведите полностью на русский: "Hello"',
-              correctAnswer: 'Привет'
+              correctAnswer: 'Привет | Здравствуйте | Здравствуй'
             },
             {
               type: 'input',
               question: 'Переведите: "Good morning"',
-              correctAnswer: 'Доброе утро'
+              correctAnswer: 'Доброе утро | С добрым утром'
             },
             {
               type: 'input',
               question: 'Переведите: "Thank you"',
-              correctAnswer: 'Спасибо'
+              correctAnswer: 'Спасибо | Благодарю вас | Благодарю | Сэнк ю'
             }
           ]
         }
@@ -168,17 +168,17 @@ export const LESSON_CONTENT: Record<string, StaticLesson> = {
             {
                type: 'input',
                question: 'Переведите: "Hi"',
-               correctAnswer: 'Привет'
+               correctAnswer: 'Привет | Приветик | Хай'
             },
             {
                type: 'input',
                question: 'Переведите: "Sorry"',
-               correctAnswer: 'Извините'
+               correctAnswer: 'Извините | Простите | Прошу прощения | Сори | Сорри'
             },
             {
                type: 'input',
                question: 'Переведите: "See you later"',
-               correctAnswer: 'Увидимся позже'
+               correctAnswer: 'Увидимся позже | До скорого | До встречи | Еще увидимся | Увидимся'
             }
           ]
         }
@@ -206,17 +206,17 @@ export const LESSON_CONTENT: Record<string, StaticLesson> = {
               {
                  type: 'input',
                  question: 'Как переводится "Hello"?',
-                 correctAnswer: 'Привет'
+                 correctAnswer: 'Привет | Здравствуйте | Приветик'
               },
               {
                  type: 'input',
                  question: 'Как переводится "Hi"?',
-                 correctAnswer: 'Привет'
+                 correctAnswer: 'Привет | Хай | Приветик'
               },
               {
                  type: 'input',
                  question: 'Как переводится "Bye"?',
-                 correctAnswer: 'Пока'
+                 correctAnswer: 'Пока | До свидания | Счастливо'
               }
            ]
         }
@@ -364,17 +364,17 @@ export const LESSON_CONTENT: Record<string, StaticLesson> = {
             {
               type: 'input',
               question: 'Переведите: "I’m from Russia"',
-              correctAnswer: 'Я из России'
+              correctAnswer: 'Я из России | Из России я | Я приехал из России | Я фром раша'
             },
             {
               type: 'input',
               question: 'Переведите: "He’s a student"',
-              correctAnswer: 'Он студент'
+              correctAnswer: 'Он студент | Студент он | Он является студентом'
             },
             {
               type: 'input',
               question: 'Переведите: "She’s my friend"',
-              correctAnswer: 'Она моя подруга'
+              correctAnswer: 'Она моя подруга | Она мой друг | Подруга моя она'
             }
           ]
         }
@@ -389,7 +389,7 @@ export const LESSON_CONTENT: Record<string, StaticLesson> = {
             ['2', '**two**', 'ту'],
             ['3', '**three**', 'сри'],
             ['4', '**four**', 'фо'],
-            ['5', '**five**', 'файв'],
+            ['5', '**pure**', 'файв'],
             ['6', '**six**', 'сикс'],
             ['7', '**seven**', 'сэвэн'],
             ['8', '**eight**', 'эйт'],
@@ -430,17 +430,17 @@ export const LESSON_CONTENT: Record<string, StaticLesson> = {
             {
               type: 'input',
               question: 'Переведите: "Мне 25 лет" (напишите число цифрами)',
-              correctAnswer: 'I am 25 years old'
+              correctAnswer: 'I am 25 years old | I am 25 | I\'m 25 years old | I\'m 25'
             },
             {
               type: 'input',
               question: 'Переведите: "Нас трое"',
-              correctAnswer: 'We are three'
+              correctAnswer: 'We are three | Нас три человека | Нас три'
             },
             {
               type: 'input',
               question: 'Переведите: "Это номер пять"',
-              correctAnswer: 'It is number five'
+              correctAnswer: 'It is number five | Это пятый номер | Это номер 5'
             }
           ]
         }
@@ -478,17 +478,17 @@ export const LESSON_CONTENT: Record<string, StaticLesson> = {
               {
                  type: 'input',
                  question: 'Переведите: "I’m Alex"',
-                 correctAnswer: 'Я Алекс'
+                 correctAnswer: 'Я Алекс | Меня зовут Алекс | Это я Алекс'
               },
               {
                  type: 'input',
                  question: 'Переведите: "Nice to meet you"',
-                 correctAnswer: 'Приятно познакомиться'
+                 correctAnswer: 'Приятно познакомиться | Рад знакомству | Приятно встретиться'
               },
               {
                  type: 'input',
                  question: 'Переведите: "Nice to meet you too"',
-                 correctAnswer: 'Мне тоже приятно познакомиться'
+                 correctAnswer: 'Мне тоже приятно познакомиться | Взаимно | Мне тоже приятно | И мне приятно познакомиться'
               }
            ]
         }
@@ -698,17 +698,17 @@ export const LESSON_CONTENT: Record<string, StaticLesson> = {
             {
               type: 'input',
               question: 'Переведите: "Ты из России?"',
-              correctAnswer: 'Are you from Russia'
+              correctAnswer: 'Are you from Russia | Are you from Russia?'
             },
             {
               type: 'input',
               question: 'Переведите: "Она француженка?"',
-              correctAnswer: 'Is she French'
+              correctAnswer: 'Is she French | Is she French?'
             },
             {
               type: 'input',
               question: 'Переведите: "Он не американец"',
-              correctAnswer: 'He is not American'
+              correctAnswer: 'He is not American | He isn\'t American'
             }
           ]
         }
@@ -721,17 +721,17 @@ export const LESSON_CONTENT: Record<string, StaticLesson> = {
             {
                type: 'input',
                question: 'Переведите: "Are you from Russia?"',
-               correctAnswer: 'Ты из России'
+               correctAnswer: 'Ты из России | Ты приехал из России | Вы из России | Вы приехали из России | Ты из раши'
             },
             {
                type: 'input',
                question: 'Переведите: "She is French"',
-               correctAnswer: 'Она француженка'
+               correctAnswer: 'Она француженка | Она из Франции | Она французская'
             },
             {
                type: 'input',
                question: 'Переведите: "He is not American"',
-               correctAnswer: 'Он не американец'
+               correctAnswer: 'Он не американец | Он не из Америки | Американец он не'
             }
           ]
         }
@@ -744,12 +744,12 @@ export const LESSON_CONTENT: Record<string, StaticLesson> = {
             {
                type: 'input',
                question: 'Напишите: "Я не из США"',
-               correctAnswer: 'I am not from the USA'
+               correctAnswer: 'I am not from the USA | I am not from USA | I\'m not from the USA | I am not from the us'
             },
             {
                type: 'input',
                question: 'Напишите: "Мы не англичане"',
-               correctAnswer: 'We are not English'
+               correctAnswer: 'We are not English | We\'re not English | We are not from England'
             }
           ]
         }
@@ -786,18 +786,18 @@ export const LESSON_CONTENT: Record<string, StaticLesson> = {
            exercises: [
               {
                  type: 'input',
-                 question: 'Переведите: "Откуда ты?"',
-                 correctAnswer: 'Where are you from'
+                 question: 'Переведите: "Where are you from?"',
+                 correctAnswer: 'Where are you from | Откуда ты | Откуда вы | Ты откуда | Вы откуда'
               },
               {
                  type: 'input',
-                 question: 'Переведите: "Я из России"',
-                 correctAnswer: 'I am from Russia'
+                 question: 'Переведите: "I am from Russia"',
+                 correctAnswer: 'Я из России | Я приехал из России | Из России я'
               },
               {
                  type: 'input',
-                 question: 'Переведите: "Ты русский?"',
-                 correctAnswer: 'Are you Russian'
+                 question: 'Переведите: "Are you Russian?"',
+                 correctAnswer: 'Ты русский | Вы русский | Вы русская | Ты русская | Вы русские'
               },
               {
                  type: 'input',
@@ -875,9 +875,9 @@ export const LESSON_CONTENT: Record<string, StaticLesson> = {
           headers: ['Английский', 'Перевод', 'Звучит как'],
           rows: [
             ['**goodbye**', 'до свидания', 'гудбай'],
-            ['**bye**', 'пока', 'бай'],
-            ['**see you**', 'увидимся', 'си ю'],
-            ['**see you later**', 'увидимся позже', 'си ю лейта']
+            ['**bye**', 'пока', '바이'],
+            ['**see you**', 'увидимся', '시 유'],
+            ['**see you later**', 'увидимся позже', '시 유 레이타']
           ]
         }
       },
@@ -1030,17 +1030,17 @@ export const LESSON_CONTENT: Record<string, StaticLesson> = {
             {
                type: 'input',
                question: 'Переведите: "I live here"',
-               correctAnswer: 'Я живу здесь'
+               correctAnswer: 'Я живу здесь | Я живу тут | Здесь я живу | Тут я живу | Я здесь живу | Я тут живу | Я лив хир'
             },
             {
                type: 'input',
                question: 'Переведите: "My city is very new"',
-               correctAnswer: 'Мой город очень новый'
+               correctAnswer: 'Мой город очень новый | Мой город совсем новый | Город мой очень новый'
             },
             {
                type: 'input',
                question: 'Переведите: "Where are you from?"',
-               correctAnswer: 'Откуда ты'
+               correctAnswer: 'Откуда ты | Откуда вы | Ты откуда | Вы откуда | Откуда ты приехал | Откуда вы приехали'
             }
           ]
         }
@@ -1053,17 +1053,17 @@ export const LESSON_CONTENT: Record<string, StaticLesson> = {
             {
                type: 'input',
                question: 'Переведите: "Я живу здесь"',
-               correctAnswer: 'I live here'
+               correctAnswer: 'I live here | I\'m living here'
             },
             {
                type: 'input',
                question: 'Переведите: "Я тоже из Москвы"',
-               correctAnswer: 'I am from Moscow too'
+               correctAnswer: 'I am from Moscow too | I\'m from Moscow too | I am also from Moscow'
             },
             {
                type: 'input',
                question: 'Переведите: "Где ты?"',
-               correctAnswer: 'Where are you'
+               correctAnswer: 'Where are you | Where are you?'
             }
            ]
         }
@@ -1104,17 +1104,17 @@ export const LESSON_CONTENT: Record<string, StaticLesson> = {
               {
                  type: 'input',
                  question: 'Как переводится "What is your name"?',
-                 correctAnswer: 'Как тебя зовут'
+                 correctAnswer: 'Как тебя зовут | Как вас зовут | Какое твое имя | Как твое имя | Твое имя какое'
               },
               {
                  type: 'input',
                  question: 'Переведите ответ: "My name is Alex"',
-                 correctAnswer: 'Меня зовут Алекс'
+                 correctAnswer: 'Меня зовут Алекс | Мое имя Алекс | Я Алекс | Имя мое Алекс'
               },
               {
                  type: 'input',
                  question: 'Переведите: "I live here now"',
-                 correctAnswer: 'Я живу здесь сейчас'
+                 correctAnswer: 'Я живу здесь сейчас | Я сейчас живу здесь | Я живу тут сейчас | Сейчас я живу здесь | Я теперь живу здесь | Я живу здесь теперь'
               }
            ]
         }
@@ -1127,7 +1127,7 @@ export const LESSON_CONTENT: Record<string, StaticLesson> = {
              {
                 type: 'input',
                 question: 'Напишите о себе (представьте, что вы Алекс из Москвы).\n\nПереведите одной фразой: "Привет. Меня зовут Алекс. Я из Москвы. Я живу здесь сейчас."',
-                correctAnswer: 'Hello My name is Alex I am from Moscow I live here now'
+                correctAnswer: 'Hello My name is Alex I am from Moscow I live here now | Hi my name is Alex I\'m from Moscow I live here now | Hello My name is Alex I am from Moscow I live here now.'
              }
            ]
         }
